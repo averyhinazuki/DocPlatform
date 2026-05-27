@@ -5,6 +5,7 @@ import com.example.docplatform.dto.auth.RegisterRequest;
 import com.example.docplatform.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +35,10 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest req) {
-        req.getSession(false);
+        HttpSession session = req.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok().build();
     }
