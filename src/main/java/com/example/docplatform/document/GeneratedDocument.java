@@ -3,6 +3,7 @@ package com.example.docplatform.document;
 import com.example.docplatform.enums.ReportStatus;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -11,8 +12,8 @@ import java.time.LocalDateTime;
 @Data
 public class GeneratedDocument {
     @Id private String id;
-    private Long tenantId;
-    private Long scheduleId;
+    @Indexed private Long tenantId;
+    @Indexed private Long scheduleId;
     private String fileFormat;
     private ReportStatus status;
     private String minioBucket;
