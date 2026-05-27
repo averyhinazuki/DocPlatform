@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+  <h2>Your report is ready</h2>
+  <p>Document ID: <strong th:text="${documentId}">ID</strong></p>
+  <p>Format: <strong th:text="${fileFormat}">FORMAT</strong></p>
+  <p><a th:href="${downloadUrl}">Download Report</a></p>
+</body>
+</html>
