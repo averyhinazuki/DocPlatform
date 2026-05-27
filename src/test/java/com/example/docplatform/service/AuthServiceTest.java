@@ -27,6 +27,15 @@ class AuthServiceTest {
     @InjectMocks AuthService authService;
 
     @Test
+    void register(){
+        Tenant t2=new Tenant();
+        t2.setId(2L);
+        when(tenantMapper.selectOne(any())).thenReturn(t2);      // tenant exists
+        when(userMapper.selectCount(any())).thenReturn(0L);
+        authService.register(new RegisterRequest("avery", "123456", "hnzk"));
+    }
+
+    @Test
     void register_throwsWhenTenantNotFound() {
         when(tenantMapper.selectOne(any())).thenReturn(null);
         assertThatThrownBy(() -> authService.register(

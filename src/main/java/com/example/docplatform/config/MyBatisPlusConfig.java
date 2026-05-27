@@ -15,7 +15,7 @@ import java.util.Set;
 @Configuration
 public class MyBatisPlusConfig {
 
-    private static final Set<String> TENANT_EXEMPT = Set.of("tenants");
+    private static final Set<String> TENANT_EXEMPT = Set.of("tenants", "users");
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {

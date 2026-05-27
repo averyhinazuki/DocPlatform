@@ -10,10 +10,14 @@ import com.example.docplatform.exception.ResourceNotFoundException;
 import com.example.docplatform.mapper.TenantMapper;
 import com.example.docplatform.mapper.UserMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -46,7 +50,12 @@ public class AuthService {
     }
 
     public void login(LoginRequest req, HttpServletRequest httpReq) {
-        authenticationManager.authenticate(
+        Authentication auth = authenticationManager.authenticate(
             new UsernamePasswordAuthenticationToken(req.username(), req.password()));
+
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        HttpSession session = httpReq.getSession(true);
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+            SecurityContextHolder.getContext());
     }
 }
