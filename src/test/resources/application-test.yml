@@ -9,8 +9,6 @@ spring:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
       - org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration
       - org.springframework.boot.autoconfigure.session.SessionAutoConfiguration
-      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
-      - org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration
   datasource:
     url: jdbc:mysql://localhost:3306/docplatform?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
