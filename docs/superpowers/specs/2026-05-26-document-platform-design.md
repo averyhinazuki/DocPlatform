@@ -20,7 +20,8 @@ A multi-tenant enterprise platform that generates, schedules, and delivers repor
 | Session store | Spring Session Data Redis |
 | ORM | MyBatis-Plus (`TenantLineInnerInterceptor` for row-level tenancy) |
 | Primary DB | MySQL / MariaDB |
-| Document store | MongoDB (templates, generated docs, GridFS for file storage) |
+| Document store | MongoDB (templates, generated docs, notification metadata) |
+| File storage | MinIO (S3-compatible; swappable with AWS S3 via config) |
 | Cache / locks | Redis + Redisson (distributed lock, RateLimiter, RTopic pub/sub) |
 | Messaging | Apache Kafka + Spring Kafka |
 | PDF | Flying Saucer + Thymeleaf (HTML → PDF) |
@@ -29,7 +30,7 @@ A multi-tenant enterprise platform that generates, schedules, and delivers repor
 | ZIP | Zip4j |
 | PDF encryption | Bouncy Castle |
 | Email | Spring Mail + Thymeleaf HTML templates |
-| Dev infra | Docker Compose (MySQL, MongoDB, Redis, Kafka, Zookeeper) |
+| Dev infra | Docker Compose (MySQL, MongoDB, Redis, Kafka, Zookeeper, MinIO) |
 | Testing | JUnit 5 + Mockito + Testcontainers |
 | Build / DX | Maven · Lombok · MapStruct · Swagger/OpenAPI |
 
@@ -62,7 +63,7 @@ com.example.docplatform
 ├── notification/     EmailNotificationService, InAppNotificationService
 ├── report/
 │   ├── generator/    PdfReportGenerator, ExcelReportGenerator, CsvReportGenerator
-│   └── storage/      DocumentStorageService (MongoDB GridFS)
+│   └── storage/      DocumentStorageService (MinIO)
 ├── scheduler/        ReportScheduler (@Scheduled cron)
 ├── security/         SecurityConfig, TenantSecurityInterceptor
 ├── service/          TenantService, UserService, ReportService,
@@ -105,11 +106,11 @@ report_templates
 
 generated_documents
   _id, tenant_id, schedule_id, file_format, status (PENDING/COMPLETED/FAILED),
-  gridfs_file_id, generated_at, delivered_at, error_msg
+  minio_bucket, minio_object_key, generated_at, delivered_at, error_msg
 
 file_metadata
   _id, tenant_id, original_name, content_type, size_bytes,
-  gridfs_file_id, created_at
+  minio_bucket, minio_object_key, created_at
 
 notifications
   _id, tenant_id, user_id, message, read: false, created_at
@@ -139,8 +140,8 @@ POST /api/reports/generate
 
 ReportJobConsumer (Kafka: report.requested)
   → routes to PdfReportGenerator / ExcelReportGenerator / CsvReportGenerator
-  → stores output in MongoDB GridFS
-  → updates GeneratedDocument (status=COMPLETED, gridfs_file_id)
+  → uploads output file to MinIO (bucket: "reports/{tenant_id}/")
+  → updates GeneratedDocument (status=COMPLETED, minio_bucket, minio_object_key)
   → publishes ReportCompletedEvent → Kafka topic: report.completed
 
 NotificationConsumer (Kafka: report.completed)
@@ -165,7 +166,7 @@ ReportScheduler (@Scheduled every 1 min)
 ```
 GET /api/files/{documentId}
   → FileController verifies session + tenant ownership via TenantContextHolder
-  → streams GridFS file via StreamingResponseBody (no full load into memory)
+  → generates MinIO presigned URL (TTL 5 min) OR streams via StreamingResponseBody
   → sets Content-Disposition: attachment; filename="..."
 ```
 
@@ -196,7 +197,7 @@ Every request
 | Decision | Rationale |
 |---|---|
 | Redisson lock on report generation | Prevents duplicate jobs from concurrent requests or scheduler ticks firing at the same millisecond |
-| MongoDB GridFS for file storage | Avoids storing large binaries in MySQL; supports streaming downloads without loading full file into memory |
+| MinIO for file storage | S3-compatible object store; swappable with AWS S3 via config change; presigned URLs offload streaming from the app server |
 | `TenantLineInnerInterceptor` | Eliminates need to manually add `tenant_id` to every query — enforced at ORM layer |
 | Kafka as async boundary | Decouples report generation (slow) from HTTP response (fast); consumer can retry on failure |
 | Thymeleaf for both PDF source and email | Single template engine for two output channels reduces cognitive overhead |
