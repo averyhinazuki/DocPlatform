@@ -12,4 +12,6 @@ public class DocPlatformApplication {
     public static void main(String[] args) {
         SpringApplication.run(DocPlatformApplication.class, args);
     }
+
+
 }

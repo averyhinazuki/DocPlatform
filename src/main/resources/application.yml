@@ -2,11 +2,10 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/docplatform?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
-    password: root
+    password: 123456
   sql:
     init:
-      mode: always
-      schema-locations: classpath:schema.sql
+      mode: never
   data:
     mongodb.uri: mongodb://localhost:27017/docplatform
     redis:
