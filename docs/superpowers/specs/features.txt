@@ -1,0 +1,32 @@
+1. Multi-Tenancy
+Two companies — Acme Corp and Beta Ltd — both use your platform. They log in, see only their own reports, schedules, and templates. No data bleeds between them. Technically: every MySQL row has a tenant_id, and MyBatis-Plus automatically appends WHERE tenant_id = ? to every query so you never accidentally query across tenants.
+
+---
+2. Report Scheduling
+Acme's admin sets up: "Every Monday 8am, generate an Excel sales report and email it to finance@acme.com." That's a ReportSchedule row with cron_expr = "0 8 * * MON". A background job wakes up every minute, finds due schedules, and fires them. No human needs to click anything.
+
+---
+3. Report Generation (PDF / Excel / CSV)
+When a report job runs, the platform fetches a Thymeleaf HTML template from MongoDB, injects data (sales figures, user counts, whatever), renders it to HTML, then converts it to PDF via Flying Saucer — or writes rows to an Excel file via Apache POI, or a CSV via OpenCSV. The ouO.
+
+---
+4. Kafka Job Queue
+Report generation is slow (seconds, sometimenstead of making the HTTP request wait, the
+
+---
+5. Redisson Distributed Lock
+Without a lock, if the scheduler fires twice at the same millisecond (or a user clicks "generate" twice), you'd get two identical reports stored and two emails sent. The Redisson lock (report:{tenant_id}:{schedule_id}) ensures only one job runs at a time per report — the second request blocks, sees the lock is held, and backs off.
+
+---
+6. File Storage (MinIO)
+All generated files live in MinIO, organized/2026-05-27-sales.pdf. When a user wants toates a presigned URL (a temporary signed link, valid 5 min) and redirects them — the file streams directly from MinIO, not through your app server.
+
+---
+7. Notifications (Email + In-App)
+When a report finishes, two things happen in parallel:
+- Email: Spring Mail sends an HTML email (buwnload link
+- In-app: A Notification document is saved to MongoDB (for the bell icon list), and Redisson RTopic broadcasts a push event to any connected client of that tenant in real time
+
+---
+8. Session Auth + Role Access
+Users log in with username/password. Spring Security creates a server-side session stored in Redis. An HttpOnly cookie holds the session ID (JavaScript can't read it — XSS protection). ADMIN role can manage tenants and templates; USER role can only view and download their own reports.
