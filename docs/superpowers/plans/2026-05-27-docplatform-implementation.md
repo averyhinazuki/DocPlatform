@@ -999,42 +999,61 @@ git add src/ && git commit -m "feat: MongoDB documents and repositories"
 
 - [ ] **Write failing test**
 
+> Note: The original plan used Testcontainers, but Docker Desktop 4.73+ on Windows returns HTTP 400 to docker-java on every pipe and on TCP 2375 (stub Info response with `"com.docker.desktop.address"` label hint). Docker CLI and `curl` work; docker-java does not. Workaround: run MinIO via the project's `docker-compose.yml` and have the test connect to `localhost:9000`. The test uses `@EnabledIf` on a reachability probe so it skips cleanly when MinIO is not running.
+
+Before running: `docker compose up -d minio`
+
 ```java
-@Testcontainers
+@EnabledIf("isMinioReachable")
 class DocumentStorageServiceTest {
 
-    @Container
-    static GenericContainer<?> minio = new GenericContainer<>("minio/minio:latest")
-        .withCommand("server /data")
-        .withEnv("MINIO_ROOT_USER", "minioadmin")
-        .withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
-        .withExposedPorts(9000);
+    private static final String ENDPOINT = System.getProperty("minio.endpoint", "http://localhost:9000");
+    private static final String ACCESS_KEY = System.getProperty("minio.access-key", "minioadmin");
+    private static final String SECRET_KEY = System.getProperty("minio.secret-key", "minioadmin");
+    private static final String BUCKET = "reports";
 
+    private static MinioClient client;
     private DocumentStorageService storageService;
 
-    @BeforeEach
-    void setUp() throws Exception {
-        String endpoint = "http://" + minio.getHost() + ":" + minio.getMappedPort(9000);
-        MinioClient client = MinioClient.builder()
-            .endpoint(endpoint).credentials("minioadmin", "minioadmin").build();
-        if (!client.bucketExists(BucketExistsArgs.builder().bucket("reports").build())) {
-            client.makeBucket(MakeBucketArgs.builder().bucket("reports").build());
+    static boolean isMinioReachable() {
+        try {
+            URL url = new URL(ENDPOINT + "/minio/health/live");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(1000);
+            conn.setReadTimeout(1000);
+            conn.setRequestMethod("GET");
+            int code = conn.getResponseCode();
+            return code >= 200 && code < 500;
+        } catch (Exception e) {
+            return false;
         }
-        storageService = new DocumentStorageService(client, "reports");
+    }
+
+    @BeforeAll
+    static void initClient() throws Exception {
+        client = MinioClient.builder().endpoint(ENDPOINT).credentials(ACCESS_KEY, SECRET_KEY).build();
+        if (!client.bucketExists(BucketExistsArgs.builder().bucket(BUCKET).build())) {
+            client.makeBucket(MakeBucketArgs.builder().bucket(BUCKET).build());
+        }
+    }
+
+    @BeforeEach
+    void setUp() {
+        storageService = new DocumentStorageService(client, BUCKET);
     }
 
     @Test
     void uploadAndPresignedUrl() throws Exception {
         byte[] content = "hello".getBytes();
         String key = storageService.upload(1L, "test.txt", content, "text/plain");
-        assertThat(key).contains("reports/1/");
+        assertThat(key).startsWith("reports/1/").endsWith("-test.txt");
         String url = storageService.generatePresignedUrl(key);
-        assertThat(url).isNotBlank();
+        assertThat(url).isNotBlank().contains(BUCKET);
     }
 }
 ```
 
-- [ ] **Run:** Expected FAIL
+- [ ] **Run:** Expected FAIL (DocumentStorageService not yet implemented)
 
 - [ ] **Create `MinioConfig.java`**
 
@@ -2038,6 +2057,305 @@ public class AsyncConfig {
 - [ ] **Commit**
 ```bash
 git add src/ && git commit -m "chore: Swagger config, async executor, full build verified"
+```
+
+---
+
+### Task 13: Tenant Creation API
+
+**Context:** `AuthService.register()` requires a tenant slug to exist before any user can sign up. Without a way to create tenants via the API, the platform cannot be bootstrapped. Tenant creation is public (no auth required) so organizations can self-register; listing tenants is admin-only.
+
+**Files:**
+- Create: `src/main/java/com/example/docplatform/dto/tenant/{TenantRequest,TenantResponse}.java`
+- Create: `src/main/java/com/example/docplatform/service/TenantService.java`
+- Create: `src/main/java/com/example/docplatform/controller/TenantController.java`
+- Modify: `src/main/java/com/example/docplatform/security/SecurityConfig.java` — permit `/api/tenants` POST
+- Test: `src/test/java/com/example/docplatform/service/TenantServiceTest.java`
+
+- [ ] **Create DTOs**
+
+```java
+// TenantRequest.java
+public record TenantRequest(
+    @NotBlank String name,
+    @NotBlank String slug,
+    String plan
+) {}
+
+// TenantResponse.java
+public record TenantResponse(
+    Long id,
+    String name,
+    String slug,
+    String plan,
+    LocalDateTime createdAt
+) {}
+```
+
+- [ ] **Create `TenantService.java`**
+
+```java
+@Service
+@RequiredArgsConstructor
+public class TenantService {
+
+    private final TenantMapper tenantMapper;
+
+    public TenantResponse create(TenantRequest req) {
+        Long count = tenantMapper.selectCount(
+            new LambdaQueryWrapper<Tenant>().eq(Tenant::getSlug, req.slug()));
+        if (count > 0) throw new IllegalArgumentException("Slug already taken: " + req.slug());
+
+        Tenant t = new Tenant();
+        t.setName(req.name());
+        t.setSlug(req.slug());
+        t.setPlan(req.plan() != null ? req.plan() : "FREE");
+        t.setCreatedAt(LocalDateTime.now());
+        tenantMapper.insert(t);
+        return toResponse(t);
+    }
+
+    public List<TenantResponse> list() {
+        return tenantMapper.selectList(null).stream().map(this::toResponse).toList();
+    }
+
+    private TenantResponse toResponse(Tenant t) {
+        return new TenantResponse(t.getId(), t.getName(), t.getSlug(), t.getPlan(), t.getCreatedAt());
+    }
+}
+```
+
+- [ ] **Create `TenantController.java`**
+
+```java
+@RestController
+@RequestMapping("/api/tenants")
+@RequiredArgsConstructor
+public class TenantController {
+
+    private final TenantService tenantService;
+
+    @PostMapping
+    public ResponseEntity<TenantResponse> create(@Valid @RequestBody TenantRequest req) {
+        return ResponseEntity.status(201).body(tenantService.create(req));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<TenantResponse> list() {
+        return tenantService.list();
+    }
+}
+```
+
+- [ ] **Update `SecurityConfig.java`** — permit `POST /api/tenants`
+
+```java
+.requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/tenants").permitAll()
+.anyRequest().authenticated()
+```
+
+- [ ] **Write and run `TenantServiceTest.java`**
+
+```java
+@ExtendWith(MockitoExtension.class)
+class TenantServiceTest {
+
+    @Mock TenantMapper tenantMapper;
+    @InjectMocks TenantService tenantService;
+
+    @Test
+    void create_insertsAndReturnsTenant() {
+        when(tenantMapper.selectCount(any())).thenReturn(0L);
+        when(tenantMapper.insert(any())).thenAnswer(inv -> {
+            Tenant t = inv.getArgument(0);
+            t.setId(1L);
+            return 1;
+        });
+
+        TenantResponse resp = tenantService.create(new TenantRequest("Acme Corp", "acme", null));
+
+        assertThat(resp.id()).isEqualTo(1L);
+        assertThat(resp.slug()).isEqualTo("acme");
+        assertThat(resp.plan()).isEqualTo("FREE");
+        verify(tenantMapper).insert(any(Tenant.class));
+    }
+
+    @Test
+    void create_throwsWhenSlugTaken() {
+        when(tenantMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> tenantService.create(new TenantRequest("Dupe", "acme", null)))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Slug already taken");
+    }
+}
+```
+
+- [ ] **Run:** `mvn test -Dtest=TenantServiceTest -q`  Expected: PASS
+
+- [ ] **Commit**
+```bash
+git add src/ && git commit -m "feat: tenant creation API — POST /api/tenants (public), GET /api/tenants (admin)"
+```
+
+---
+
+### Task 14: Bootstrap + Role Promotion
+
+**Context:** No one can ever reach `ADMIN` role through the API — `register` hardcodes `Role.USER`. `POST /api/admin/bootstrap` solves the chicken-and-egg problem with a one-shot endpoint that self-disables after the first admin is created (same pattern as Vault `sys/init`, Keycloak first-run). `PATCH /api/users/{id}/role` gives ongoing admin control after bootstrap.
+
+**Files:**
+- Create: `src/main/java/com/example/docplatform/dto/admin/BootstrapRequest.java`
+- Create: `src/main/java/com/example/docplatform/dto/user/RoleUpdateRequest.java`
+- Create: `src/main/java/com/example/docplatform/service/UserService.java`
+- Create: `src/main/java/com/example/docplatform/controller/AdminController.java`
+- Modify: `src/main/java/com/example/docplatform/security/SecurityConfig.java` — permit `POST /api/admin/bootstrap`
+- Test: `src/test/java/com/example/docplatform/service/UserServiceTest.java`
+
+- [ ] **Create DTOs**
+
+```java
+// BootstrapRequest.java
+public record BootstrapRequest(
+    @NotBlank String username,
+    @NotBlank String password
+) {}
+
+// RoleUpdateRequest.java
+public record RoleUpdateRequest(@NotNull Role role) {}
+```
+
+- [ ] **Create `UserService.java`**
+
+```java
+@Service
+@RequiredArgsConstructor
+public class UserService {
+
+    private final UserMapper userMapper;
+    private final TenantMapper tenantMapper;
+    private final PasswordEncoder passwordEncoder;
+
+    public void bootstrap(BootstrapRequest req) {
+        Long adminCount = userMapper.selectCount(
+            new LambdaQueryWrapper<User>().eq(User::getRole, Role.ADMIN));
+        if (adminCount > 0) {
+            throw new IllegalStateException("System already bootstrapped — an admin user exists");
+        }
+
+        // Bootstrap tenant if none exists
+        Tenant tenant = tenantMapper.selectOne(
+            new LambdaQueryWrapper<Tenant>().eq(Tenant::getSlug, "system"));
+        if (tenant == null) {
+            tenant = new Tenant();
+            tenant.setName("System"); tenant.setSlug("system"); tenant.setPlan("ENTERPRISE");
+            tenant.setCreatedAt(LocalDateTime.now());
+            tenantMapper.insert(tenant);
+        }
+
+        User admin = new User();
+        admin.setTenantId(tenant.getId());
+        admin.setUsername(req.username());
+        admin.setPasswordHash(passwordEncoder.encode(req.password()));
+        admin.setRole(Role.ADMIN);
+        admin.setCreatedAt(LocalDateTime.now());
+        userMapper.insert(admin);
+    }
+
+    public void updateRole(Long userId, Role role) {
+        User user = userMapper.selectById(userId);
+        if (user == null) throw new ResourceNotFoundException("User not found: " + userId);
+        user.setRole(role);
+        userMapper.updateById(user);
+    }
+}
+```
+
+- [ ] **Create `AdminController.java`**
+
+```java
+@RestController
+@RequiredArgsConstructor
+public class AdminController {
+
+    private final UserService userService;
+
+    @PostMapping("/api/admin/bootstrap")
+    public ResponseEntity<Void> bootstrap(@Valid @RequestBody BootstrapRequest req) {
+        userService.bootstrap(req);
+        return ResponseEntity.status(201).build();
+    }
+
+    @PatchMapping("/api/users/{id}/role")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> updateRole(@PathVariable Long id,
+                                           @Valid @RequestBody RoleUpdateRequest req) {
+        userService.updateRole(id, req.role());
+        return ResponseEntity.ok().build();
+    }
+}
+```
+
+- [ ] **Update `SecurityConfig.java`** — permit bootstrap endpoint
+
+```java
+.requestMatchers(HttpMethod.POST, "/api/tenants").permitAll()
+.requestMatchers(HttpMethod.POST, "/api/admin/bootstrap").permitAll()
+```
+
+- [ ] **Write and run `UserServiceTest.java`**
+
+```java
+@ExtendWith(MockitoExtension.class)
+class UserServiceTest {
+
+    @Mock UserMapper userMapper;
+    @Mock TenantMapper tenantMapper;
+    @Mock PasswordEncoder passwordEncoder;
+    @InjectMocks UserService userService;
+
+    @Test
+    void bootstrap_createsAdminWhenNoneExists() {
+        when(userMapper.selectCount(any())).thenReturn(0L);
+        when(tenantMapper.selectOne(any())).thenReturn(null);
+        when(tenantMapper.insert(any(Tenant.class))).thenAnswer(inv -> {
+            ((Tenant) inv.getArgument(0)).setId(1L); return 1;
+        });
+        when(passwordEncoder.encode(any())).thenReturn("hashed");
+
+        userService.bootstrap(new BootstrapRequest("admin", "secret"));
+
+        verify(userMapper).insert(argThat(u -> u.getRole() == Role.ADMIN));
+    }
+
+    @Test
+    void bootstrap_throwsWhenAdminAlreadyExists() {
+        when(userMapper.selectCount(any())).thenReturn(1L);
+
+        assertThatThrownBy(() -> userService.bootstrap(new BootstrapRequest("admin", "secret")))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("already bootstrapped");
+    }
+
+    @Test
+    void updateRole_changesUserRole() {
+        User u = new User(); u.setId(5L); u.setRole(Role.USER);
+        when(userMapper.selectById(5L)).thenReturn(u);
+
+        userService.updateRole(5L, Role.ADMIN);
+
+        verify(userMapper).updateById(argThat(updated -> updated.getRole() == Role.ADMIN));
+    }
+}
+```
+
+- [ ] **Run:** `mvn test -Dtest=UserServiceTest -q`  Expected: PASS
+
+- [ ] **Commit**
+```bash
+git add src/ && git commit -m "feat: bootstrap endpoint + role promotion — self-disabling one-shot admin init"
 ```
 
 ---
