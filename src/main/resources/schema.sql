@@ -50,5 +50,7 @@ CREATE TABLE IF NOT EXISTS report_assignments (
   status       ENUM('PENDING','COMPLETED') DEFAULT 'PENDING',
   document_id  VARCHAR(100),
   created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-  completed_at DATETIME
+  completed_at DATETIME,
+  INDEX idx_ra_tenant (tenant_id),
+  INDEX idx_ra_assignee_status (assignee_id, status)
 );
