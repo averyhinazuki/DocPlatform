@@ -7,6 +7,8 @@ import SchedulesView from '../views/SchedulesView.vue'
 import ReportsView from '../views/ReportsView.vue'
 import FilesView from '../views/FilesView.vue'
 import AdminView from '../views/AdminView.vue'
+import TemplatesView from '../views/TemplatesView.vue'
+import AssignmentsView from '../views/AssignmentsView.vue'
 
 const routes = [
   { path: '/', redirect: '/dashboard' },
@@ -16,7 +18,9 @@ const routes = [
   { path: '/schedules', component: SchedulesView, meta: { requiresAuth: true } },
   { path: '/reports', component: ReportsView, meta: { requiresAuth: true } },
   { path: '/files', component: FilesView, meta: { requiresAuth: true } },
+  { path: '/templates', component: TemplatesView, meta: { requiresAuth: true } },
   { path: '/admin', component: AdminView, meta: { requiresAuth: true } },
+  { path: '/assignments', component: AssignmentsView, meta: { requiresAuth: true } },
 ]
 
 const router = createRouter({
@@ -24,8 +28,9 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
+  await authStore.ensureInitialized()
   if (to.meta.requiresAuth && !authStore.username) {
     return '/login'
   }
