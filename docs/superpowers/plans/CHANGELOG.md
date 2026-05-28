@@ -4,6 +4,19 @@
 
 ## [Unreleased] — 2026-05-29
 
+### Report Assignments — AssignmentService
+Business logic layer for the report_assignments feature. Implements create, listByTenant, listMine, and complete operations. One disambiguation fix was applied to the test: changed `when(assignmentMapper.insert(any()))` to `when(assignmentMapper.insert(any(ReportAssignment.class)))` to resolve ambiguity between the two BaseMapper `insert` overloads.
+
+Files added:
+- `src/main/java/com/example/docplatform/service/AssignmentService.java` — @Service with create, listByTenant, listMine, complete
+
+Files modified:
+- `src/test/java/com/example/docplatform/service/AssignmentServiceTest.java` — expanded from 1 test to 5 (create, listMine, complete, complete throws for wrong tenant)
+
+Test results: 26 tests, 0 failures, 0 errors (all tests pass).
+
+---
+
 ### Report Assignments — enum, entity, mapper, DTO records
 Java layer for Report Assignments feature. AssignmentStatus enum (PENDING, COMPLETED), ReportAssignment entity with MyBatis-Plus annotations, ReportAssignmentMapper (CRUD), and three DTO records: AssignmentRequest (assigneeId, templateId, notes), AssignmentResponse (for admin view), MyAssignmentResponse (for assignee view).
 
