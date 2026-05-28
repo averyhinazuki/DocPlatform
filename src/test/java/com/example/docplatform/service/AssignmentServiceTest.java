@@ -108,4 +108,35 @@ class AssignmentServiceTest {
         assertThatThrownBy(() -> assignmentService.complete(5L, 1L, "doc-abc"))
             .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    void listByTenant_returnsAssignmentsWithResolvedNames() {
+        ReportAssignment a = new ReportAssignment();
+        a.setId(1L);
+        a.setTenantId(1L);
+        a.setAssigneeId(20L);
+        a.setTemplateId("tmpl-1");
+        a.setNotes("Check Q1");
+        a.setStatus(AssignmentStatus.PENDING);
+        a.setCreatedAt(LocalDateTime.now());
+
+        when(assignmentMapper.selectList(any())).thenReturn(List.of(a));
+
+        User user = new User();
+        user.setId(20L);
+        user.setUsername("averyuser");
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(user));
+
+        ReportTemplate tmpl = new ReportTemplate();
+        tmpl.setId("tmpl-1");
+        tmpl.setName("Sales Report");
+        when(templateRepository.findAllById(any())).thenReturn(List.of(tmpl));
+
+        List<AssignmentResponse> result = assignmentService.listByTenant(1L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).assigneeUsername()).isEqualTo("averyuser");
+        assertThat(result.get(0).templateName()).isEqualTo("Sales Report");
+        assertThat(result.get(0).notes()).isEqualTo("Check Q1");
+    }
 }
