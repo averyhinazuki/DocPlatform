@@ -40,11 +40,14 @@ public class AuthService {
             new LambdaQueryWrapper<User>().eq(User::getUsername, req.username()));
         if (count > 0) throw new IllegalArgumentException("Username already taken");
 
+        long tenantUserCount = userMapper.selectCount(
+            new LambdaQueryWrapper<User>().eq(User::getTenantId, tenant.getId()));
+
         User user = new User();
         user.setTenantId(tenant.getId());
         user.setUsername(req.username());
         user.setPasswordHash(passwordEncoder.encode(req.password()));
-        user.setRole(Role.USER);
+        user.setRole(tenantUserCount == 0 ? Role.ADMIN : Role.USER);
         user.setCreatedAt(LocalDateTime.now());
         userMapper.insert(user);
     }

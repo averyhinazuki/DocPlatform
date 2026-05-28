@@ -1,6 +1,5 @@
 package com.example.docplatform.controller;
 
-import com.example.docplatform.dto.admin.BootstrapRequest;
 import com.example.docplatform.dto.user.RoleUpdateRequest;
 import com.example.docplatform.service.UserService;
 import jakarta.validation.Valid;
@@ -14,12 +13,6 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final UserService userService;
-
-    @PostMapping("/api/admin/bootstrap")
-    public ResponseEntity<Void> bootstrap(@Valid @RequestBody BootstrapRequest req) {
-        userService.bootstrap(req);
-        return ResponseEntity.status(201).build();
-    }
 
     @PatchMapping("/api/users/{id}/role")
     @PreAuthorize("hasRole('ADMIN')")

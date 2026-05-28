@@ -37,8 +37,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/tenants").permitAll()
-                .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/admin/bootstrap").permitAll()
-                .anyRequest().authenticated())
+.anyRequest().authenticated())
             .formLogin(AbstractHttpConfigurer::disable)
             .httpBasic(AbstractHttpConfigurer::disable)
             .addFilterAfter(tenantContextFilter, UsernamePasswordAuthenticationFilter.class);
