@@ -4,6 +4,22 @@
 
 ## [Unreleased] — 2026-05-29
 
+### Report Assignments — enum, entity, mapper, DTO records
+Java layer for Report Assignments feature. AssignmentStatus enum (PENDING, COMPLETED), ReportAssignment entity with MyBatis-Plus annotations, ReportAssignmentMapper (CRUD), and three DTO records: AssignmentRequest (assigneeId, templateId, notes), AssignmentResponse (for admin view), MyAssignmentResponse (for assignee view).
+
+Files added:
+- `src/main/java/com/example/docplatform/enums/AssignmentStatus.java` — enum with PENDING, COMPLETED
+- `src/main/java/com/example/docplatform/entity/ReportAssignment.java` — entity with @TableName("report_assignments"), @TableId(AUTO)
+- `src/main/java/com/example/docplatform/mapper/ReportAssignmentMapper.java` — extends BaseMapper<ReportAssignment>
+- `src/main/java/com/example/docplatform/dto/assignment/AssignmentRequest.java` — record with assigneeId, templateId, notes
+- `src/main/java/com/example/docplatform/dto/assignment/AssignmentResponse.java` — record with id, assigneeUsername, templateName, notes, status, createdAt, completedAt, documentId
+- `src/main/java/com/example/docplatform/dto/assignment/MyAssignmentResponse.java` — record with id, templateId, templateName, notes, createdAt
+- `src/test/java/com/example/docplatform/service/AssignmentServiceTest.java` — test verifying AssignmentStatus has PENDING and COMPLETED
+
+Test results: All tests pass (1 test, 0 failures, 0 errors).
+
+---
+
 ### Report Assignments table (schema)
 Added `report_assignments` table to store assignments created by admins for users to generate specific reports. Fields: id, tenant_id, created_by, assignee_id, template_id, notes, status (PENDING/COMPLETED), document_id, created_at, completed_at.
 
