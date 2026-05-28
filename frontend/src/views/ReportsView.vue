@@ -2,9 +2,14 @@
   <div class="page">
     <h1>Generate Report</h1>
     <div class="card" style="max-width: 560px;">
-      <h2>One-off Report</h2>
+      <h2>{{ assignmentMode ? 'Complete Assignment' : 'One-off Report' }}</h2>
+
+      <div v-if="assignmentMode && assignmentNotes" class="note-banner">
+        <strong>Admin note:</strong> {{ assignmentNotes }}
+      </div>
+
       <form @submit.prevent="submit">
-        <div class="form-row">
+        <div class="form-row" v-if="!assignmentMode">
           <div class="form-group">
             <label>Schedule ID</label>
             <input v-model.number="form.scheduleId" type="number" placeholder="42" required />
@@ -18,17 +23,33 @@
             </select>
           </div>
         </div>
-        <div class="form-group">
-          <label>Report Type</label>
-          <input v-model="form.reportType" type="text" placeholder="SALES" required />
+        <div class="form-group" v-if="assignmentMode">
+          <label>Format</label>
+          <select v-model="form.format">
+            <option value="PDF">PDF</option>
+            <option value="EXCEL">Excel</option>
+            <option value="CSV">CSV</option>
+          </select>
         </div>
         <div class="form-group">
-          <label>Template ID</label>
-          <input v-model="form.templateId" type="text" placeholder="MongoDB template _id" required />
+          <label>Template</label>
+          <select v-model="selectedTemplateId" :disabled="assignmentMode" required>
+            <option value="" disabled>Select a template…</option>
+            <option v-for="t in templates" :key="t.id" :value="t.id">{{ t.name }} ({{ t.type }})</option>
+          </select>
+          <span v-if="selectedTemplate" class="hint" style="margin-top:4px;display:block">
+            Params: {{ selectedTemplate.variables?.join(', ') || 'none' }}
+          </span>
         </div>
         <div class="form-group">
-          <label>Recipients (comma-separated)</label>
-          <input v-model="recipientsRaw" type="text" placeholder="alice@acme.com" />
+          <label>Recipients</label>
+          <div class="user-picker">
+            <label v-for="u in tenantUsers" :key="u.id" class="user-pick-item">
+              <input type="checkbox" :value="u.username" v-model="selectedRecipients" />
+              {{ u.username }}
+            </label>
+            <span v-if="tenantUsers.length === 0" class="hint">No users in this tenant.</span>
+          </div>
         </div>
         <div class="form-group">
           <label>Params (JSON)</label>
@@ -53,15 +74,52 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { generateReport } from '../api/reports'
+import { listUsers } from '../api/users'
+import { listTemplates } from '../api/templates'
+import { getMyAssignments } from '../api/assignments'
+
+const route = useRoute()
+const assignmentId = computed(() => route.query.assignmentId ? Number(route.query.assignmentId) : null)
+const assignmentMode = computed(() => assignmentId.value != null)
+const assignmentNotes = ref('')
 
 const form = reactive({ scheduleId: null, reportType: '', format: 'PDF', templateId: '' })
-const recipientsRaw = ref('')
+const selectedRecipients = ref([])
+const tenantUsers = ref([])
+const templates = ref([])
+const selectedTemplateId = ref('')
+const selectedTemplate = computed(() => templates.value.find(t => t.id === selectedTemplateId.value) ?? null)
 const paramsRaw = ref('')
 const loading = ref(false)
 const error = ref('')
 const documentId = ref('')
+
+watch(selectedTemplateId, id => {
+  const t = templates.value.find(t => t.id === id)
+  if (t) { form.templateId = t.id; form.reportType = t.type }
+})
+
+onMounted(async () => {
+  try {
+    const [usersRes, templatesRes] = await Promise.all([listUsers(), listTemplates()])
+    tenantUsers.value = usersRes.data
+    templates.value = templatesRes.data
+
+    if (assignmentMode.value) {
+      const queryTemplateId = route.query.templateId
+      if (queryTemplateId) selectedTemplateId.value = queryTemplateId
+
+      const mineRes = await getMyAssignments()
+      const match = mineRes.data.find(a => a.id === assignmentId.value)
+      if (match) assignmentNotes.value = match.notes ?? ''
+    }
+  } catch {
+    // non-critical
+  }
+})
 
 async function submit() {
   loading.value = true
@@ -78,10 +136,13 @@ async function submit() {
         return
       }
     }
-    const recipients = recipientsRaw.value
-      ? recipientsRaw.value.split(',').map(s => s.trim()).filter(Boolean)
-      : []
-    const res = await generateReport({ ...form, params, recipients })
+    const payload = {
+      ...form,
+      params,
+      recipients: selectedRecipients.value,
+      ...(assignmentMode.value ? { assignmentId: assignmentId.value, scheduleId: null } : {})
+    }
+    const res = await generateReport(payload)
     documentId.value = res.data.documentId
   } catch (e) {
     error.value = e.response?.data?.message ?? e.message ?? 'Failed to submit report'
@@ -93,6 +154,14 @@ async function submit() {
 
 <style scoped>
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.note-banner {
+  padding: 12px 14px; margin-bottom: 20px;
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm);
+  font-size: 14px; color: #1e40af;
+}
+.user-picker { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.user-pick-item { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.hint { font-size: 13px; color: var(--text-2); }
 .result-box {
   margin-top: 24px; padding: 16px;
   background: var(--bg); border-radius: var(--radius-sm);
