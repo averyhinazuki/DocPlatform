@@ -112,7 +112,15 @@ async function submit() {
   createSuccess.value = false
   try {
     let params = {}
-    if (paramsRaw.value.trim()) params = JSON.parse(paramsRaw.value)
+    if (paramsRaw.value.trim()) {
+      try {
+        params = JSON.parse(paramsRaw.value)
+      } catch {
+        createError.value = 'Invalid JSON in Params field'
+        creating.value = false
+        return
+      }
+    }
     const recipients = recipientsRaw.value
       ? recipientsRaw.value.split(',').map(s => s.trim()).filter(Boolean)
       : []
