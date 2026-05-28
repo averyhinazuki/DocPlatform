@@ -39,3 +39,16 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   detail TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS report_assignments (
+  id           BIGINT AUTO_INCREMENT PRIMARY KEY,
+  tenant_id    BIGINT NOT NULL,
+  created_by   BIGINT NOT NULL,
+  assignee_id  BIGINT NOT NULL,
+  template_id  VARCHAR(100) NOT NULL,
+  notes        TEXT,
+  status       ENUM('PENDING','COMPLETED') DEFAULT 'PENDING',
+  document_id  VARCHAR(100),
+  created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+  completed_at DATETIME
+);
