@@ -24,17 +24,21 @@ public class ReportService {
     private final GeneratedDocumentRepository documentRepository;
 
     public String requestReport(Long tenantId, ReportRequest req) {
-        String lockKey = "report:" + tenantId + ":" + req.scheduleId();
+        String lockKey = req.scheduleId() != null
+            ? "report:" + tenantId + ":" + req.scheduleId()
+            : "report:assignment:" + tenantId + ":" + req.assignmentId();
         RLock lock = redissonClient.getLock(lockKey);
         try {
             if (!lock.tryLock(3, 30, TimeUnit.SECONDS)) {
                 throw new IllegalStateException("Report generation already in progress for this schedule");
             }
 
-            boolean alreadyQueued = documentRepository.existsByScheduleIdAndStatusIn(
-                req.scheduleId(), List.of(ReportStatus.PENDING, ReportStatus.IN_PROGRESS));
-            if (alreadyQueued) {
-                throw new IllegalStateException("Report already queued");
+            if (req.scheduleId() != null) {
+                boolean alreadyQueued = documentRepository.existsByScheduleIdAndStatusIn(
+                    req.scheduleId(), List.of(ReportStatus.PENDING, ReportStatus.IN_PROGRESS));
+                if (alreadyQueued) {
+                    throw new IllegalStateException("Report already queued");
+                }
             }
 
             GeneratedDocument doc = new GeneratedDocument();

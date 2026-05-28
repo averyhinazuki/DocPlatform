@@ -8,10 +8,11 @@ import java.util.List;
 import java.util.Map;
 
 public record ReportRequest(
-    @NotNull Long scheduleId,
+    Long scheduleId,           // nullable for assignment-based reports
     @NotBlank String reportType,
     @NotNull FileFormat format,
     @NotBlank String templateId,
     Map<String, Object> params,
-    List<String> recipients
+    List<String> recipients,
+    Long assignmentId          // nullable; triggers auto-complete when present
 ) {}
