@@ -2,6 +2,43 @@
 
 ---
 
+## 2026-05-29 — Report Assignments
+
+**Feature:** Admin can assign a report task to a user (template + guidance note). User sees it on Dashboard, clicks Generate Report, fills in params, submits. Assignment auto-completes on submit. Admin can track status.
+
+**Backend files created:**
+- `src/main/resources/schema.sql` (modified — report_assignments table)
+- `src/main/java/com/example/docplatform/enums/AssignmentStatus.java`
+- `src/main/java/com/example/docplatform/entity/ReportAssignment.java`
+- `src/main/java/com/example/docplatform/mapper/ReportAssignmentMapper.java`
+- `src/main/java/com/example/docplatform/dto/assignment/AssignmentRequest.java`
+- `src/main/java/com/example/docplatform/dto/assignment/AssignmentResponse.java`
+- `src/main/java/com/example/docplatform/dto/assignment/MyAssignmentResponse.java`
+- `src/main/java/com/example/docplatform/service/AssignmentService.java`
+- `src/main/java/com/example/docplatform/controller/AssignmentController.java`
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/dto/report/ReportRequest.java` (scheduleId nullable, assignmentId added)
+- `src/main/java/com/example/docplatform/service/ReportService.java` (null scheduleId handling)
+- `src/main/java/com/example/docplatform/scheduler/ReportScheduler.java` (updated to 7-arg ReportRequest)
+- `src/main/java/com/example/docplatform/controller/ReportController.java` (calls assignmentService.complete)
+
+**Frontend files created:**
+- `frontend/src/api/assignments.js`
+
+**Frontend files modified:**
+- `frontend/src/views/DashboardView.vue` (My Assignments card)
+- `frontend/src/views/ReportsView.vue` (assignment-aware mode)
+- `frontend/src/views/AdminView.vue` (Assignments panel)
+
+**Tests created:**
+- `src/test/java/com/example/docplatform/service/AssignmentServiceTest.java`
+
+**Tests modified:**
+- `src/test/java/com/example/docplatform/service/ReportServiceTest.java` (updated ReportRequest constructor to 7 args)
+
+---
+
 ## [Unreleased] — 2026-05-29
 
 ### Report Assignments — AssignmentService
