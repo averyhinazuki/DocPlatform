@@ -42,6 +42,18 @@
           </span>
         </div>
         <div class="form-group">
+          <label>Data File <span class="hint">(.csv or .xlsx — header row must match variable names)</span></label>
+          <input ref="fileInput" type="file" accept=".csv,.xlsx" style="display:none" @change="onFileChange" />
+          <div v-if="attachedFile" class="file-chip">
+            <span>{{ attachedFile.name }}</span>
+            <button type="button" class="chip-clear" @click="clearFile">×</button>
+          </div>
+          <button v-else type="button" class="btn btn-ghost btn-sm" @click="fileInput.click()">
+            Attach Data File
+          </button>
+        </div>
+
+        <div class="form-group">
           <label>Recipients</label>
           <div class="user-picker">
             <label v-for="u in tenantUsers" :key="u.id" class="user-pick-item">
@@ -98,6 +110,8 @@ const templates = ref([])
 const selectedTemplateId = ref('')
 const selectedTemplate = computed(() => templates.value.find(t => t.id === selectedTemplateId.value) ?? null)
 const paramsForm = reactive({})
+const fileInput = ref(null)
+const attachedFile = ref(null)
 const loading = ref(false)
 const error = ref('')
 const documentId = ref('')
@@ -111,6 +125,9 @@ watch(selectedTemplateId, id => {
     if (t.variables) t.variables.forEach(v => { paramsForm[v] = '' })
   }
 })
+
+function onFileChange(e) { attachedFile.value = e.target.files[0] ?? null }
+function clearFile() { attachedFile.value = null; fileInput.value.value = '' }
 
 function humanize(key) {
   return key
@@ -150,8 +167,9 @@ async function submit() {
       recipients: selectedRecipients.value,
       ...(assignmentMode.value ? { assignmentId: assignmentId.value, scheduleId: null } : {})
     }
-    const res = await generateReport(payload)
+    const res = await generateReport(payload, attachedFile.value)
     documentId.value = res.data.documentId
+    clearFile()
   } catch (e) {
     error.value = e.response?.data?.message ?? e.message ?? 'Failed to submit report'
   } finally {
@@ -183,6 +201,15 @@ async function submit() {
   word-break: break-all; margin-bottom: 8px;
 }
 .result-hint { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+.file-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 12px; border-radius: 20px;
+  background: var(--bg); border: 1px solid var(--border); font-size: 13px;
+}
+.chip-clear {
+  background: none; border: none; cursor: pointer;
+  font-size: 16px; color: var(--text-2); line-height: 1; padding: 0;
+}
 .params-grid { display: flex; flex-direction: column; gap: 10px; }
 .param-row { display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 12px; }
 .param-label { font-size: 13px; color: var(--text-2); font-weight: 500; }

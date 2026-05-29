@@ -3,16 +3,17 @@ package com.example.docplatform.controller;
 import com.example.docplatform.dto.report.ReportRequest;
 import com.example.docplatform.security.TenantUserDetails;
 import com.example.docplatform.service.AssignmentService;
+import com.example.docplatform.service.AttachmentParserService;
 import com.example.docplatform.service.ReportService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -22,14 +23,28 @@ public class ReportController {
 
     private final ReportService reportService;
     private final AssignmentService assignmentService;
+    private final AttachmentParserService attachmentParser;
 
-    @PostMapping("/generate")
+    @PostMapping(value = "/generate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, String>> generate(
-            @RequestBody @Valid ReportRequest req,
+            @RequestPart("request") @Valid ReportRequest req,
+            @RequestPart(value = "file", required = false) MultipartFile file,
             @AuthenticationPrincipal TenantUserDetails user) {
-        String docId = reportService.requestReport(user.tenantId(), req, user.username());
-        if (req.assignmentId() != null) {
-            assignmentService.complete(req.assignmentId(), user.tenantId(), docId);
+
+        ReportRequest effectiveReq = req;
+        if (file != null && !file.isEmpty()) {
+            Map<String, Object> fileParams = attachmentParser.parse(file);
+            Map<String, Object> merged = new HashMap<>(fileParams);
+            if (req.params() != null) merged.putAll(req.params());
+            effectiveReq = new ReportRequest(
+                req.scheduleId(), req.reportType(), req.format(),
+                req.templateId(), merged, req.recipients(), req.assignmentId()
+            );
+        }
+
+        String docId = reportService.requestReport(user.tenantId(), effectiveReq, user.username());
+        if (effectiveReq.assignmentId() != null) {
+            assignmentService.complete(effectiveReq.assignmentId(), user.tenantId(), docId);
         }
         return ResponseEntity.accepted().body(Map.of("documentId", docId));
     }
