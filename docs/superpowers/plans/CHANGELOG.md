@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-05-29 — Attach Data File (Report Generation)
+
+**Feature:** Users can attach a `.csv` or `.xlsx` file when generating a report. The backend parses the header row + first data row into a `Map<String, Object>` and merges it into `params` before the Kafka job fires. Manually entered form values override file values. Unsupported extensions and malformed files return 400.
+
+**Backend files created:**
+- `src/main/java/com/example/docplatform/service/AttachmentParserService.java` — parses CSV (OpenCSV) and Excel (Apache POI) attachments
+- `src/test/java/com/example/docplatform/service/AttachmentParserServiceTest.java` — 5 tests (CSV, Excel, error cases)
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/controller/ReportController.java` — changed to multipart/form-data, injects AttachmentParserService, merges file params
+
+**Frontend files modified:**
+- `frontend/src/api/reports.js` — always sends FormData; appends file part when present
+- `frontend/src/views/ReportsView.vue` — file input, chip display, clear button, wired into submit
+
+---
+
 ## 2026-05-29 — Dynamic Params Form
 
 **Feature:** The raw `Params (JSON)` textarea in ReportsView is replaced by a dynamic list of labeled text inputs — one per variable declared on the selected template. Switching templates resets the inputs. Templates with no variables show nothing. Works in both one-off and assignment modes.
