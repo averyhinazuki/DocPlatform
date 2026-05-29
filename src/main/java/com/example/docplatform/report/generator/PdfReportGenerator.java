@@ -21,9 +21,21 @@ public final class PdfReportGenerator implements ReportGenerator {
 
     @Override
     public byte[] generate(ReportTemplate template, Map<String, Object> params) throws Exception {
-        Context ctx = new Context();
-        ctx.setVariables(params);
-        String html = templateEngine.process(template.getThymeleafTemplate(), ctx);
+        Object override = params.get("__content");
+        String html;
+        if (override != null && !override.toString().isBlank()) {
+            html = override.toString();
+        } else {
+            String templateContent = template.getThymeleafTemplate();
+            if (templateContent == null || templateContent.isBlank()) {
+                throw new IllegalStateException(
+                    "Template '" + template.getName() + "' has no HTML content. " +
+                    "Re-create the template via the Templates page to generate its HTML.");
+            }
+            Context ctx = new Context();
+            ctx.setVariables(params);
+            html = templateEngine.process(templateContent, ctx);
+        }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PdfRendererBuilder builder = new PdfRendererBuilder();

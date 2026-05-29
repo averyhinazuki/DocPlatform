@@ -15,5 +15,6 @@ public record ReportRequest(
     Map<String, Object> params,
     List<String> recipients,
     Long assignmentId,
-    String note
+    String note,
+    String contentOverride
 ) {}

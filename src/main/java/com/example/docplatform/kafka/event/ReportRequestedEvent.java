@@ -13,5 +13,6 @@ public record ReportRequestedEvent(
     Map<String, Object> params,
     List<String> recipients,
     String triggeredBy,
-    String note
+    String note,
+    String contentOverride
 ) {}

@@ -16,7 +16,9 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -42,7 +44,13 @@ public class ReportJobConsumer {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No generator for: " + event.fileFormat()));
 
-            byte[] content = generator.generate(template, event.params());
+            Map<String, Object> params = event.params() != null
+                ? new HashMap<>(event.params())
+                : new HashMap<>();
+            if (event.contentOverride() != null && !event.contentOverride().isBlank()) {
+                params.put("__content", event.contentOverride());
+            }
+            byte[] content = generator.generate(template, params);
 
             String contentType = switch (FileFormat.valueOf(event.fileFormat())) {
                 case PDF   -> "application/pdf";
