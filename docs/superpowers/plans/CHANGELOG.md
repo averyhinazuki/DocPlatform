@@ -2,6 +2,36 @@
 
 ---
 
+## 2026-05-29 — Report Note
+
+**Feature:** Optional note field on report generation form. Note travels through the full Kafka pipeline (`ReportRequest` → `ReportRequestedEvent` → `GeneratedDocument` → `ReportCompletedEvent` → `Notification`) and surfaces as italic secondary text in the notification bell, Dashboard notifications card, and Files preview panel.
+
+**Backend files modified:**
+- `dto/report/ReportRequest.java` — added `String note`
+- `kafka/event/ReportRequestedEvent.java` — added `String note`
+- `kafka/event/ReportCompletedEvent.java` — added `String note`
+- `service/ReportService.java` — passes `req.note()` into event
+- `document/GeneratedDocument.java` — added `String note`
+- `kafka/consumer/ReportJobConsumer.java` — saves note to doc; passes to completed event
+- `document/Notification.java` — added `String note`
+- `notification/InAppNotificationService.java` — added `note` param to `send()`
+- `kafka/consumer/NotificationConsumer.java` — passes `event.note()` to `inAppService.send()`
+- `dto/file/DocumentSummary.java` — added `String note`
+- `service/FileService.java` — maps `doc.getNote()` into summary
+- `controller/ReportController.java` — passes `req.note()` in reconstructed request
+- `scheduler/ReportScheduler.java` — passes `null` for note
+
+**Tests fixed:**
+- `ReportServiceTest.java`, `InAppNotificationServiceTest.java` (×2) — updated call signatures
+
+**Frontend files modified:**
+- `frontend/src/views/ReportsView.vue` — note textarea (optional)
+- `frontend/src/views/FilesView.vue` — note shown in preview toolbar
+- `frontend/src/components/NotificationBell.vue` — note shown below message
+- `frontend/src/views/DashboardView.vue` — note shown below message
+
+---
+
 ## 2026-05-29 — Attach Data File (Report Generation)
 
 **Feature:** Users can attach a `.csv` or `.xlsx` file when generating a report. The backend parses the header row + first data row into a `Map<String, Object>` and merges it into `params` before the Kafka job fires. Manually entered form values override file values. Unsupported extensions and malformed files return 400.
