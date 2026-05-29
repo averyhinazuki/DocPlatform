@@ -35,10 +35,13 @@
       </div>
       <div v-for="n in notifStore.unread" :key="n.id" class="notif-row">
         <span class="notif-dot"></span>
-        <div>
+        <div class="notif-body">
           <p>{{ n.message }}</p>
           <p class="timestamp">{{ formatDate(n.createdAt) }}</p>
         </div>
+        <button v-if="n.documentId" class="btn btn-sm preview-btn" @click="navigateToDoc(n.documentId)">
+          Preview
+        </button>
       </div>
       <p class="error-msg" v-if="notifError">{{ notifError }}</p>
     </div>
@@ -47,10 +50,16 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
 import { getMyAssignments } from '../api/assignments'
 
 const notifStore = useNotificationStore()
+const router = useRouter()
+
+function navigateToDoc(documentId) {
+  router.push('/files?docId=' + documentId)
+}
 const notifLoading = ref(false)
 const notifError = ref('')
 
@@ -99,9 +108,11 @@ function formatDate(iso) {
 .assignment-info { flex: 1; margin-right: 16px; }
 .assignment-title { font-weight: 600; margin-bottom: 2px; }
 .assignment-note { font-size: 13px; color: var(--text-2); margin-bottom: 2px; }
-.notif-row { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.notif-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--border); }
 .notif-row:last-child { border-bottom: none; }
-.notif-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
+.notif-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.notif-body { flex: 1; }
+.preview-btn { flex-shrink: 0; }
 .timestamp { font-size: 12px; color: var(--text-2); margin-top: 2px; }
 .btn-sm { padding: 6px 14px; font-size: 13px; white-space: nowrap; }
 </style>
