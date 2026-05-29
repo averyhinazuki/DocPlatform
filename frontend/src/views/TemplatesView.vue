@@ -19,6 +19,10 @@
           <label>Variables <span class="hint">(comma-separated — these become the params keys)</span></label>
           <input v-model="variablesRaw" type="text" placeholder="region, sales, period" />
         </div>
+        <div v-if="!variablesRaw.trim()" class="form-group">
+          <label>Content <span class="hint">(PDF body — compose the document here)</span></label>
+          <RteEditor v-model="rteContent" />
+        </div>
         <button class="btn" type="submit" :disabled="creating">
           {{ creating ? 'Creating…' : 'Create Template' }}
         </button>
@@ -35,6 +39,7 @@
         <thead>
           <tr>
             <th>Name</th><th>Type</th><th>Variables</th><th>ID</th>
+            <th v-if="authStore.role === 'ADMIN'"></th>
           </tr>
         </thead>
         <tbody>
@@ -46,6 +51,9 @@
               <span v-else class="hint">—</span>
             </td>
             <td><code class="id-cell">{{ t.id }}</code></td>
+            <td v-if="authStore.role === 'ADMIN'">
+              <button class="btn-remove" @click="remove(t.id)" title="Delete template">✕</button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -56,8 +64,10 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { listTemplates, createTemplate } from '../api/templates'
+import { listTemplates, createTemplate, deleteTemplate } from '../api/templates'
 import { useAuthStore } from '../stores/auth'
+import RteEditor from '../components/RteEditor.vue'
+import { wrapHtml } from '../utils/htmlTemplate.js'
 
 const authStore = useAuthStore()
 const templates = ref([])
@@ -67,12 +77,19 @@ const creating = ref(false)
 const createError = ref('')
 const createSuccess = ref(false)
 const variablesRaw = ref('')
+const rteContent = ref('')
 const form = reactive({ name: '', type: '', thymeleafTemplate: '' })
 
+function humanize(key) {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, c => c.toUpperCase())
+}
+
 function buildPdfTemplate(name, variables) {
-  const rows = variables.map(v =>
-    `      <tr><td>${v}</td><td th:text="\${${v}}">—</td></tr>`
-  ).join('\n')
+  const headerCells = variables.map(v => `        <th>${humanize(v)}</th>`).join('\n')
+  const dataCells   = variables.map(v => `        <td th:text="\${row['${v}']}">—</td>`).join('\n')
   return `<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
@@ -88,9 +105,15 @@ function buildPdfTemplate(name, variables) {
 <body>
   <h2>${name}</h2>
   <table>
-    <thead><tr><th>Field</th><th>Value</th></tr></thead>
+    <thead>
+      <tr>
+${headerCells}
+      </tr>
+    </thead>
     <tbody>
-${rows}
+      <tr th:each="row : \${rows}">
+${dataCells}
+      </tr>
     </tbody>
   </table>
 </body>
@@ -112,6 +135,16 @@ async function load() {
   }
 }
 
+async function remove(id) {
+  if (!confirm('Delete this template? This cannot be undone.')) return
+  try {
+    await deleteTemplate(id)
+    await load()
+  } catch {
+    // non-critical: list will be stale until next refresh
+  }
+}
+
 async function submit() {
   creating.value = true
   createError.value = ''
@@ -120,10 +153,13 @@ async function submit() {
     const variables = variablesRaw.value
       ? variablesRaw.value.split(',').map(s => s.trim()).filter(Boolean)
       : []
-    const thymeleafTemplate = buildPdfTemplate(form.name, variables)
+    const thymeleafTemplate = variables.length === 0
+      ? wrapHtml(rteContent.value)
+      : buildPdfTemplate(form.name, variables)
     await createTemplate({ ...form, thymeleafTemplate, variables })
     createSuccess.value = true
     variablesRaw.value = ''
+    rteContent.value = ''
     Object.assign(form, { name: '', type: '', thymeleafTemplate: '' })
     await load()
   } catch (e) {
@@ -141,4 +177,10 @@ async function submit() {
 .hint { font-size: 12px; color: var(--text-2); }
 .id-cell { font-size: 11px; color: var(--text-2); word-break: break-all; }
 code { background: var(--bg); padding: 2px 6px; border-radius: 4px; }
+.btn-remove {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 13px; padding: 2px 6px; border-radius: 4px;
+  line-height: 1;
+}
+.btn-remove:hover { background: #fee2e2; color: #dc2626; }
 </style>
