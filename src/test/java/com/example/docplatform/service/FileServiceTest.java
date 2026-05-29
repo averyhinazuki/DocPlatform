@@ -97,6 +97,19 @@ class FileServiceTest {
     }
 
     @Test
+    void delete_skipsMinioWhenNoObjectKey() throws Exception {
+        GeneratedDocument doc = new GeneratedDocument();
+        doc.setId("doc-2"); doc.setTenantId(1L);
+        doc.setMinioObjectKey(null);
+        when(documentRepository.findById("doc-2")).thenReturn(Optional.of(doc));
+
+        fileService.delete(1L, "doc-2");
+
+        verify(storageService, never()).delete(Mockito.any());
+        verify(documentRepository).deleteById("doc-2");
+    }
+
+    @Test
     void delete_throwsResourceNotFoundWhenMissing() {
         when(documentRepository.findById("missing")).thenReturn(Optional.empty());
 

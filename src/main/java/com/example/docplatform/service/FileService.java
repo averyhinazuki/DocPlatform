@@ -35,7 +35,9 @@ public class FileService {
             throw new TenantAccessDeniedException("Access denied to document: " + documentId);
         }
 
-        storageService.delete(doc.getMinioObjectKey());
+        if (doc.getMinioObjectKey() != null) {
+            storageService.delete(doc.getMinioObjectKey());
+        }
         documentRepository.deleteById(documentId);
     }
 
