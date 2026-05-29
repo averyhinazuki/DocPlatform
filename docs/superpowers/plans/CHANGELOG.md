@@ -2,6 +2,23 @@
 
 ---
 
+## 2026-05-29 — Admin File Delete
+
+**Feature:** Admins can delete a generated document from the Files page. A `✕` button appears in each row of the document list (admin-only, using `authStore.role === 'ADMIN'`). Clicking it shows a confirmation prompt, then calls `DELETE /api/files/{documentId}`. The backend removes the MinIO object first, then deletes the MongoDB record — both scoped to the caller's tenant. The deleted entry is removed from the list immediately; if it was selected, the preview panel clears.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/service/FileService.java` — added `delete(tenantId, documentId)`: tenant guard + MinIO removal + MongoDB deletion
+- `src/main/java/com/example/docplatform/controller/FileController.java` — added `DELETE /api/files/{documentId}` (`@PreAuthorize("hasRole('ADMIN')")`, 204 No Content)
+
+**Frontend files modified:**
+- `frontend/src/api/files.js` — added `deleteDocument(id)`
+- `frontend/src/views/FilesView.vue` — admin-only `✕` button per row; `remove()` handler; `doc-meta` sub-container for badge/status/date; `btn-remove` styles
+
+**Tests modified:**
+- `src/test/java/com/example/docplatform/service/FileServiceTest.java` — added 3 tests: happy-path delete, missing doc → ResourceNotFoundException, wrong tenant → TenantAccessDeniedException
+
+---
+
 ## 2026-05-29 — Rich Text Editor for No-Parameter PDF Templates
 
 **Feature:** Admins can now compose static PDF content using a Rich Text Editor (Quill, standard toolbar) when creating a template with no variables. When a user generates a PDF report from such a template, the editor is pre-filled with the admin's content and the user can edit it before submitting. The edited HTML travels as `contentOverride` through the Kafka pipeline and is used directly by `PdfReportGenerator`, bypassing Thymeleaf.
