@@ -68,7 +68,12 @@
           <textarea v-model="form.note" placeholder="e.g. Use Q1 figures, exclude returns" rows="2"></textarea>
         </div>
 
-        <div v-if="selectedTemplate?.variables?.length" class="form-group">
+        <div v-if="isRteMode" class="form-group">
+          <label>Content <span class="hint">(pre-filled from template — edit before generating)</span></label>
+          <RteEditor v-model="rteContent" />
+        </div>
+
+        <div v-else-if="selectedTemplate?.variables?.length" class="form-group">
           <label>Report Data</label>
           <div class="params-grid">
             <div v-for="v in selectedTemplate.variables" :key="v" class="param-row">
@@ -100,8 +105,10 @@ import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { generateReport } from '../api/reports'
 import { listUsers } from '../api/users'
-import { listTemplates } from '../api/templates'
+import { listTemplates, getTemplate } from '../api/templates'
 import { getMyAssignments } from '../api/assignments'
+import RteEditor from '../components/RteEditor.vue'
+import { wrapHtml, extractBody } from '../utils/htmlTemplate.js'
 
 const route = useRoute()
 const assignmentId = computed(() => route.query.assignmentId ? Number(route.query.assignmentId) : null)
@@ -120,14 +127,38 @@ const attachedFile = ref(null)
 const loading = ref(false)
 const error = ref('')
 const documentId = ref('')
+const rteContent = ref('')
+const isRteMode = computed(() =>
+  selectedTemplate.value !== null &&
+  (selectedTemplate.value.variables?.length ?? 0) === 0 &&
+  form.format === 'PDF'
+)
 
-watch(selectedTemplateId, id => {
+watch(selectedTemplateId, async id => {
   const t = templates.value.find(t => t.id === id)
-  if (t) {
-    form.templateId = t.id
-    form.reportType = t.type
-    Object.keys(paramsForm).forEach(k => delete paramsForm[k])
-    if (t.variables) t.variables.forEach(v => { paramsForm[v] = '' })
+  if (!t) return
+  form.templateId = t.id
+  form.reportType = t.type
+  Object.keys(paramsForm).forEach(k => delete paramsForm[k])
+  if (t.variables) t.variables.forEach(v => { paramsForm[v] = '' })
+  rteContent.value = ''
+  if ((t.variables?.length ?? 0) === 0 && form.format === 'PDF') {
+    try {
+      const res = await getTemplate(id)
+      rteContent.value = extractBody(res.data.thymeleafTemplate ?? '')
+    } catch { /* non-critical */ }
+  }
+})
+
+watch(() => form.format, async fmt => {
+  rteContent.value = ''
+  const t = selectedTemplate.value
+  if (!t || (t.variables?.length ?? 0) !== 0) return
+  if (fmt === 'PDF') {
+    try {
+      const res = await getTemplate(t.id)
+      rteContent.value = extractBody(res.data.thymeleafTemplate ?? '')
+    } catch { /* non-critical */ }
   }
 })
 
@@ -170,6 +201,7 @@ async function submit() {
       ...form,
       params,
       recipients: selectedRecipients.value,
+      contentOverride: isRteMode.value ? wrapHtml(rteContent.value) : null,
       ...(assignmentMode.value ? { assignmentId: assignmentId.value, scheduleId: null } : {})
     }
     const res = await generateReport(payload, attachedFile.value)
