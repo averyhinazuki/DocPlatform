@@ -2,6 +2,15 @@
 
 ---
 
+## 2026-05-29 — Dynamic Params Form
+
+**Feature:** The raw `Params (JSON)` textarea in ReportsView is replaced by a dynamic list of labeled text inputs — one per variable declared on the selected template. Switching templates resets the inputs. Templates with no variables show nothing. Works in both one-off and assignment modes.
+
+**Frontend files modified:**
+- `frontend/src/views/ReportsView.vue` — replaced `paramsRaw` textarea with `paramsForm` reactive object and per-variable inputs
+
+---
+
 ## 2026-05-29 — Merge Schedules into Assignments
 
 **Feature:** Schedules functionality (create schedule, view schedule list) is merged into the Assignments page. The Schedules nav link is removed. All users see the Assignments page. Admin-only sections (Assign Report Task, All Assignments) remain gated by role. `/schedules` redirects to `/assignments` for backward-compatibility.
