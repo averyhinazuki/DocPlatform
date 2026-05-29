@@ -11,7 +11,10 @@
         <span>Notifications</span>
       </div>
       <div v-if="notifStore.unread.length === 0" class="empty">No unread notifications</div>
-      <div v-for="n in notifStore.unread" :key="n.id" class="notif-item">
+      <div v-for="n in notifStore.unread" :key="n.id"
+           class="notif-item"
+           :class="{ clickable: n.documentId }"
+           @click="n.documentId && navigate(n.documentId)">
         {{ n.message }}
       </div>
     </div>
@@ -19,15 +22,28 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useNotificationStore } from '../stores/notifications'
 
 const notifStore = useNotificationStore()
+const router = useRouter()
 const open = ref(false)
+let pollInterval = null
 
-onMounted(() => notifStore.fetch().catch(() => {}))
+onMounted(() => {
+  notifStore.fetch().catch(() => {})
+  pollInterval = setInterval(() => notifStore.fetch().catch(() => {}), 15000)
+})
+
+onUnmounted(() => clearInterval(pollInterval))
 
 function toggle() { open.value = !open.value }
+
+function navigate(documentId) {
+  open.value = false
+  router.push('/files?docId=' + documentId)
+}
 </script>
 
 <style scoped>
@@ -56,4 +72,6 @@ function toggle() { open.value = !open.value }
 .empty { padding: 16px; color: var(--text-2); font-size: 13px; text-align: center; }
 .notif-item { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
 .notif-item:last-child { border-bottom: none; }
+.notif-item.clickable { cursor: pointer; }
+.notif-item.clickable:hover { background: var(--bg); }
 </style>
