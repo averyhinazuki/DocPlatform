@@ -37,7 +37,7 @@ class ReportSchedulerTest {
 
         scheduler.triggerDueReports();
 
-        verify(reportService).requestReport(eq(10L), any());
+        verify(reportService).requestReport(eq(10L), any(), eq("system"));
         verify(scheduleService).recordRun(eq(1L), eq("0 8 * * *"));
     }
 
@@ -49,7 +49,7 @@ class ReportSchedulerTest {
         s.setParams(Map.of()); s.setRecipients(List.of());
         s.setCronExpr("0 9 * * *");
         when(scheduleService.findDueSchedules()).thenReturn(List.of(s));
-        when(reportService.requestReport(any(), any())).thenThrow(new IllegalStateException("already queued"));
+        when(reportService.requestReport(any(), any(), any())).thenThrow(new IllegalStateException("already queued"));
 
         assertThatNoException().isThrownBy(scheduler::triggerDueReports);
     }

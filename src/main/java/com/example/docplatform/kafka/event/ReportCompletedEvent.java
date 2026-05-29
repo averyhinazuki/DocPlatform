@@ -8,5 +8,7 @@ public record ReportCompletedEvent(
     String minioObjectKey,
     String minioBucket,
     String fileFormat,
-    List<String> recipients
+    List<String> recipients,
+    String templateName,
+    String triggeredBy
 ) {}

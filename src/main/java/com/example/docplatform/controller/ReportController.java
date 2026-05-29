@@ -27,7 +27,7 @@ public class ReportController {
     public ResponseEntity<Map<String, String>> generate(
             @RequestBody @Valid ReportRequest req,
             @AuthenticationPrincipal TenantUserDetails user) {
-        String docId = reportService.requestReport(user.tenantId(), req);
+        String docId = reportService.requestReport(user.tenantId(), req, user.username());
         if (req.assignmentId() != null) {
             assignmentService.complete(req.assignmentId(), user.tenantId(), docId);
         }

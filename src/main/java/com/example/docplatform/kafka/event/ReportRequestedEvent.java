@@ -11,5 +11,6 @@ public record ReportRequestedEvent(
     String fileFormat,
     String templateId,
     Map<String, Object> params,
-    List<String> recipients
+    List<String> recipients,
+    String triggeredBy
 ) {}

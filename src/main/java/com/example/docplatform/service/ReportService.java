@@ -23,7 +23,7 @@ public class ReportService {
     private final ReportJobProducer producer;
     private final GeneratedDocumentRepository documentRepository;
 
-    public String requestReport(Long tenantId, ReportRequest req) {
+    public String requestReport(Long tenantId, ReportRequest req, String triggeredBy) {
         String lockKey = req.scheduleId() != null
             ? "report:" + tenantId + ":" + req.scheduleId()
             : "report:assignment:" + tenantId + ":" + req.assignmentId();
@@ -52,7 +52,7 @@ public class ReportService {
             producer.publishRequest(new ReportRequestedEvent(
                 doc.getId(), tenantId, req.scheduleId(),
                 req.reportType(), req.format().name(),
-                req.templateId(), req.params(), req.recipients()
+                req.templateId(), req.params(), req.recipients(), triggeredBy
             ));
 
             return doc.getId();

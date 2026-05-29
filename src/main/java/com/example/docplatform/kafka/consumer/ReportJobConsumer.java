@@ -62,7 +62,8 @@ public class ReportJobConsumer {
 
             producer.publishCompleted(new ReportCompletedEvent(
                 doc.getId(), event.tenantId(), objectKey, "reports",
-                event.fileFormat(), event.recipients()));
+                event.fileFormat(), event.recipients(),
+                template.getName(), event.triggeredBy()));
 
         } catch (Exception e) {
             doc.setStatus(ReportStatus.FAILED);

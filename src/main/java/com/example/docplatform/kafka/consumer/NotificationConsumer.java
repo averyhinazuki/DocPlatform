@@ -29,7 +29,7 @@ public class NotificationConsumer {
                 event.documentId(), e.getMessage());
         }
 
-        String msg = "Report ready: " + event.documentId() + " (" + event.fileFormat() + ")";
+        String msg = "Report '" + event.templateName() + "' is ready from " + event.triggeredBy();
         inAppService.send(event.tenantId(), event.recipients(), msg, event.documentId());
     }
 }

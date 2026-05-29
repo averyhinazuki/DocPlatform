@@ -26,7 +26,7 @@ public class ReportScheduler {
             try {
                 reportService.requestReport(s.getTenantId(), new ReportRequest(
                     s.getId(), s.getReportType(), s.getFormat(),
-                    s.getTemplateId(), s.getParams(), s.getRecipients(), null));
+                    s.getTemplateId(), s.getParams(), s.getRecipients(), null), "system");
                 scheduleService.recordRun(s.getId(), s.getCronExpr());
             } catch (IllegalStateException e) {
                 log.debug("Skipping schedule {} — already queued: {}", s.getId(), e.getMessage());
