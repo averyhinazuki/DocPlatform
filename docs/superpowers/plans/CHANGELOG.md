@@ -2,6 +2,98 @@
 
 ---
 
+## 2026-05-29 — Rich Text Editor for No-Parameter PDF Templates
+
+**Feature:** Admins can now compose static PDF content using a Rich Text Editor (Quill, standard toolbar) when creating a template with no variables. When a user generates a PDF report from such a template, the editor is pre-filled with the admin's content and the user can edit it before submitting. The edited HTML travels as `contentOverride` through the Kafka pipeline and is used directly by `PdfReportGenerator`, bypassing Thymeleaf.
+
+**Toolbar:** Bold · Italic · Underline · H1 · H2 · Blockquote · Horizontal rule · Bullet list · Numbered list
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/dto/report/ReportRequest.java` — added `contentOverride`
+- `src/main/java/com/example/docplatform/kafka/event/ReportRequestedEvent.java` — added `contentOverride`
+- `src/main/java/com/example/docplatform/service/ReportService.java` — passes `contentOverride` into event
+- `src/main/java/com/example/docplatform/kafka/consumer/ReportJobConsumer.java` — injects `"__content"` into params when present
+- `src/main/java/com/example/docplatform/report/generator/PdfReportGenerator.java` — checks `"__content"` first, bypasses Thymeleaf when set
+- `src/main/java/com/example/docplatform/scheduler/ReportScheduler.java` — null for new field
+- `src/main/java/com/example/docplatform/controller/ReportController.java` — passes `contentOverride` through merge path
+- `src/main/java/com/example/docplatform/controller/TemplateController.java` — added `GET /api/templates/{id}`
+
+**Backend files created:**
+- `src/main/java/com/example/docplatform/dto/template/TemplateDetailResponse.java`
+
+**Frontend files created:**
+- `frontend/src/components/RteEditor.vue` — reusable Quill editor with standard toolbar
+- `frontend/src/utils/htmlTemplate.js` — `wrapHtml()` and `extractBody()` helpers
+
+**Frontend files modified:**
+- `frontend/src/api/templates.js` — added `getTemplate(id)`
+- `frontend/src/views/TemplatesView.vue` — shows RteEditor when variables empty
+- `frontend/src/views/ReportsView.vue` — shows pre-filled RteEditor for no-variable PDF
+
+**Tests modified:**
+- `src/test/java/com/example/docplatform/service/ReportServiceTest.java` — updated 9-arg `ReportRequest` constructors
+
+---
+
+## 2026-05-29 — Fix: CSV/Excel generators ignore rows list, show only first row
+
+**Bug:** `CsvReportGenerator` and `ExcelReportGenerator` used `params.getOrDefault(column, "")` — top-level key lookup only. After the multi-row parser change, actual data lives in `params["rows"]` (a list), while top-level keys hold only the first row. PDF worked because Thymeleaf iterates `${rows}` directly. CSV/Excel bypassed the list entirely, so output was either empty or first-row-only.
+
+**Fix:** Both generators now check for a `rows` key first. When present, they iterate over every row in the list and write one output row per entry. When absent (no file uploaded, manual params only), they fall back to the original single-row top-level-key path.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/report/generator/CsvReportGenerator.java`
+- `src/main/java/com/example/docplatform/report/generator/ExcelReportGenerator.java`
+
+---
+
+## 2026-05-29 — Multi-row data file support
+
+**Feature:** Attached `.csv` / `.xlsx` files now parse ALL data rows, not just the first. The parser returns a `rows` key (`List<Map<String, Object>>`) alongside the top-level first-row keys (backward compat). The generated PDF template uses `th:each="row : ${rows}"` so every row appears in the report table. Numeric integer cells (e.g. `1` stored as `1.0` in Excel) are now formatted without the decimal suffix.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/service/AttachmentParserService.java` — parse all rows; expose as `rows` list + top-level first-row keys; new `cellValue()` helper for clean numeric formatting
+
+**Frontend files modified:**
+- `frontend/src/views/TemplatesView.vue` — `buildPdfTemplate` now generates a column-header table with `th:each="row : ${rows}"` instead of the old field:value key-value layout
+
+**Tests modified:**
+- `src/test/java/com/example/docplatform/service/AttachmentParserServiceTest.java` — updated existing tests; added multi-row CSV, multi-row Excel, and integer-cell-format tests
+
+---
+
+## 2026-05-29 — Template Delete
+
+**Feature:** Admins can delete a template from the Available Templates table. A ✕ button appears in each row (admin-only). Clicking it shows a confirmation prompt, then calls `DELETE /api/templates/{id}` and refreshes the list. The backend guards against cross-tenant deletion.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/controller/TemplateController.java` — added `DELETE /api/templates/{id}` (admin-only, tenant-scoped)
+
+**Frontend files modified:**
+- `frontend/src/api/templates.js` — added `deleteTemplate(id)`
+- `frontend/src/views/TemplatesView.vue` — remove button + `remove()` handler
+
+---
+
+## 2026-05-29 — Fix: PDF generation fails with blank form + Excel data file
+
+**Bug:** Generating a PDF report with an attached `.xlsx` data file while leaving all form fields blank caused two failures:
+
+1. **Merge logic inversion** — `ReportController` used `putAll` to overlay form params on top of file params, so blank form strings (`""`) overrode the non-empty Excel values. Result: all template variables were empty strings.
+2. **"Premature end of file" from openhtmltopdf** — `PdfReportGenerator` passed the result of `templateEngine.process(thymeleafTemplate, ctx)` directly to `builder.withHtmlContent()`. When `thymeleafTemplate` is `""` (empty string, stored in MongoDB for templates created without HTML content), Thymeleaf's `StringTemplateResolver` returns `""`, and openhtmltopdf's XML parser throws `SAXParseException: Premature end of file at line 1, col 1`.
+
+**Fix:**
+- `ReportController` — only merge a form param into the file-param map when the form value is non-blank (blank form = "use the file value").
+- `PdfReportGenerator` — guard against null/blank `thymeleafTemplate` and throw a clear `IllegalStateException` instead of the cryptic XML parse error.
+- `TemplateRequest` — added `@NotBlank` to `thymeleafTemplate` so the API rejects template creation without HTML content at validation time.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/controller/ReportController.java`
+- `src/main/java/com/example/docplatform/report/generator/PdfReportGenerator.java`
+- `src/main/java/com/example/docplatform/dto/template/TemplateRequest.java`
+
+---
+
 ## 2026-05-29 — Report Note
 
 **Feature:** Optional note field on report generation form. Note travels through the full Kafka pipeline (`ReportRequest` → `ReportRequestedEvent` → `GeneratedDocument` → `ReportCompletedEvent` → `Notification`) and surfaces as italic secondary text in the notification bell, Dashboard notifications card, and Files preview panel.
