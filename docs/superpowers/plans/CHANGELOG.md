@@ -2,6 +2,31 @@
 
 ---
 
+## 2026-05-29 — Report Preview & Document List
+
+**Feature:** Clicking a report-ready notification navigates to the Files page with the document auto-selected and previewed. PDF reports render inline; Excel/CSV show a format-fallback message. The Files page is redesigned as a split panel (document list on the left, preview on the right) replacing the manual ID lookup.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/document/Notification.java` — added `documentId` field
+- `src/main/java/com/example/docplatform/notification/InAppNotificationService.java` — added `documentId` param to `send()`
+- `src/main/java/com/example/docplatform/kafka/consumer/NotificationConsumer.java` — passes `event.documentId()` to inAppService
+- `src/main/java/com/example/docplatform/service/FileService.java` — added `listByTenant()`
+- `src/main/java/com/example/docplatform/controller/FileController.java` — added `GET /api/files`
+
+**Backend files created:**
+- `src/main/java/com/example/docplatform/dto/file/DocumentSummary.java`
+
+**Tests created:**
+- `src/test/java/com/example/docplatform/service/InAppNotificationServiceTest.java`
+- `src/test/java/com/example/docplatform/service/FileServiceTest.java` (expanded with listByTenant tests)
+
+**Frontend files modified:**
+- `frontend/src/api/files.js` — added `listDocuments()`
+- `frontend/src/components/NotificationBell.vue` — clickable report notifications
+- `frontend/src/views/FilesView.vue` — full split-panel redesign
+
+---
+
 ## 2026-05-29 — Report Assignments
 
 **Feature:** Admin can assign a report task to a user (template + guidance note). User sees it on Dashboard, clicks Generate Report, fills in params, submits. Assignment auto-completes on submit. Admin can track status.
