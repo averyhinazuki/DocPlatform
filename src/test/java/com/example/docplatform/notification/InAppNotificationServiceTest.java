@@ -34,7 +34,7 @@ class InAppNotificationServiceTest {
         when(userMapper.selectOne(any())).thenReturn(u);
         when(redissonClient.getTopic(anyString())).thenReturn(rTopic);
 
-        service.send(1L, List.of("a@b.com"), "Report ready");
+        service.send(1L, List.of("a@b.com"), "Report ready", null);
 
         verify(notificationRepository).save(argThat(n ->
             n.getTenantId().equals(1L) && n.getUserId().equals(5L) && !n.isRead()));

@@ -20,7 +20,7 @@ public class InAppNotificationService {
     private final NotificationRepository notificationRepository;
     private final UserMapper userMapper;
 
-    public void send(Long tenantId, List<String> recipientEmails, String message) {
+    public void send(Long tenantId, List<String> recipientEmails, String message, String documentId) {
         recipientEmails.forEach(email -> {
             User user = userMapper.selectOne(
                 new LambdaQueryWrapper<User>().eq(User::getUsername, email));
@@ -32,9 +32,9 @@ public class InAppNotificationService {
             n.setMessage(message);
             n.setRead(false);
             n.setCreatedAt(LocalDateTime.now());
+            n.setDocumentId(documentId);
             notificationRepository.save(n);
 
-            // Real-time push — fire and forget
             redissonClient.getTopic("notifications:" + tenantId).publish(message);
         });
     }

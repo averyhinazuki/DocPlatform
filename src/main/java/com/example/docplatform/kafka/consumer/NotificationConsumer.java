@@ -5,9 +5,11 @@ import com.example.docplatform.notification.EmailNotificationService;
 import com.example.docplatform.notification.InAppNotificationService;
 import com.example.docplatform.report.storage.DocumentStorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class NotificationConsumer {
@@ -22,10 +24,12 @@ public class NotificationConsumer {
             String downloadUrl = storageService.generatePresignedUrl(event.minioObjectKey());
             emailService.sendReportReady(event.recipients(), event.documentId(),
                 event.fileFormat(), downloadUrl);
-            String msg = "Report ready: " + event.documentId() + " (" + event.fileFormat() + ")";
-            inAppService.send(event.tenantId(), event.recipients(), msg);
         } catch (Exception e) {
-            throw new RuntimeException("Notification delivery failed", e);
+            log.warn("Email notification failed for document {} — in-app notification will still be sent: {}",
+                event.documentId(), e.getMessage());
         }
+
+        String msg = "Report ready: " + event.documentId() + " (" + event.fileFormat() + ")";
+        inAppService.send(event.tenantId(), event.recipients(), msg, event.documentId());
     }
 }
