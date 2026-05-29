@@ -287,7 +287,6 @@ async function submitSchedule() {
     }
     await createSchedule({ ...scheduleForm, cronExpr: cronExprComputed.value, params, recipients: selectedRecipients.value })
     createSuccess.value = true
-    createSuccess.value = false
     Object.assign(scheduleForm, { name: '', cronExpr: '', reportType: '', format: 'PDF', templateId: '' })
     selectedTemplateId.value = ''
     selectedRecipients.value = []
