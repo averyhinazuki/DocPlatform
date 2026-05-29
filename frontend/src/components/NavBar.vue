@@ -4,11 +4,10 @@
       <span class="brand">DocPlatform</span>
       <div class="nav-links">
         <RouterLink to="/dashboard">Dashboard</RouterLink>
-        <RouterLink to="/schedules">Schedules</RouterLink>
         <RouterLink to="/reports">Reports</RouterLink>
         <RouterLink to="/files">Files</RouterLink>
         <RouterLink to="/templates">Templates</RouterLink>
-        <RouterLink v-if="authStore.role === 'ADMIN'" to="/assignments">Assignments</RouterLink>
+        <RouterLink to="/assignments">Assignments</RouterLink>
         <RouterLink v-if="authStore.role === 'ADMIN'" to="/admin">Admin</RouterLink>
       </div>
       <div class="nav-right">
