@@ -35,10 +35,14 @@ public class ReportController {
         if (file != null && !file.isEmpty()) {
             Map<String, Object> fileParams = attachmentParser.parse(file);
             Map<String, Object> merged = new HashMap<>(fileParams);
-            if (req.params() != null) merged.putAll(req.params());
+            if (req.params() != null) {
+                req.params().forEach((k, v) -> {
+                    if (v != null && !v.toString().isBlank()) merged.put(k, v);
+                });
+            }
             effectiveReq = new ReportRequest(
                 req.scheduleId(), req.reportType(), req.format(),
-                req.templateId(), merged, req.recipients(), req.assignmentId(), req.note()
+                req.templateId(), merged, req.recipients(), req.assignmentId(), req.note(), req.contentOverride()
             );
         }
 
