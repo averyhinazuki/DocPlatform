@@ -57,13 +57,14 @@ public class ReportJobConsumer {
             doc.setStatus(ReportStatus.COMPLETED);
             doc.setMinioBucket("reports");
             doc.setMinioObjectKey(objectKey);
+            doc.setNote(event.note());
             doc.setDeliveredAt(LocalDateTime.now());
             documentRepository.save(doc);
 
             producer.publishCompleted(new ReportCompletedEvent(
                 doc.getId(), event.tenantId(), objectKey, "reports",
                 event.fileFormat(), event.recipients(),
-                template.getName(), event.triggeredBy()));
+                template.getName(), event.triggeredBy(), event.note()));
 
         } catch (Exception e) {
             doc.setStatus(ReportStatus.FAILED);

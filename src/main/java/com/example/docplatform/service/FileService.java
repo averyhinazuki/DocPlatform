@@ -22,7 +22,7 @@ public class FileService {
     public List<DocumentSummary> listByTenant(Long tenantId) {
         return documentRepository.findByTenantIdOrderByGeneratedAtDesc(tenantId).stream()
             .map(d -> new DocumentSummary(d.getId(), d.getFileFormat(), d.getStatus(),
-                                         d.getGeneratedAt(), d.getScheduleId()))
+                                         d.getGeneratedAt(), d.getScheduleId(), d.getNote()))
             .toList();
     }
 

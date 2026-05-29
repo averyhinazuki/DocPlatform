@@ -10,5 +10,6 @@ public record DocumentSummary(
     FileFormat fileFormat,
     ReportStatus status,
     LocalDateTime generatedAt,
-    Long scheduleId
+    Long scheduleId,
+    String note
 ) {}

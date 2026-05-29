@@ -63,6 +63,11 @@
             <span v-if="tenantUsers.length === 0" class="hint">No users in this tenant.</span>
           </div>
         </div>
+        <div class="form-group">
+          <label>Note <span class="hint">(optional — travels with the report)</span></label>
+          <textarea v-model="form.note" placeholder="e.g. Use Q1 figures, exclude returns" rows="2"></textarea>
+        </div>
+
         <div v-if="selectedTemplate?.variables?.length" class="form-group">
           <label>Report Data</label>
           <div class="params-grid">
@@ -103,7 +108,7 @@ const assignmentId = computed(() => route.query.assignmentId ? Number(route.quer
 const assignmentMode = computed(() => assignmentId.value != null)
 const assignmentNotes = ref('')
 
-const form = reactive({ scheduleId: null, reportType: '', format: 'PDF', templateId: '' })
+const form = reactive({ scheduleId: null, reportType: '', format: 'PDF', templateId: '', note: '' })
 const selectedRecipients = ref([])
 const tenantUsers = ref([])
 const templates = ref([])

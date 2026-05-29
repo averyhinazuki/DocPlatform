@@ -10,5 +10,6 @@ public record ReportCompletedEvent(
     String fileFormat,
     List<String> recipients,
     String templateName,
-    String triggeredBy
+    String triggeredBy,
+    String note
 ) {}

@@ -37,6 +37,7 @@
         <span class="notif-dot"></span>
         <div class="notif-body">
           <p>{{ n.message }}</p>
+          <p v-if="n.note" class="notif-note">{{ n.note }}</p>
           <p class="timestamp">{{ formatDate(n.createdAt) }}</p>
         </div>
         <button v-if="n.documentId" class="btn btn-sm preview-btn" @click="navigateToDoc(n.documentId)">
@@ -114,5 +115,6 @@ function formatDate(iso) {
 .notif-body { flex: 1; }
 .preview-btn { flex-shrink: 0; }
 .timestamp { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.notif-note { font-size: 12px; color: var(--text-2); font-style: italic; margin-top: 2px; }
 .btn-sm { padding: 6px 14px; font-size: 13px; white-space: nowrap; }
 </style>

@@ -22,4 +22,5 @@ public class GeneratedDocument {
     private LocalDateTime generatedAt;
     private LocalDateTime deliveredAt;
     private String errorMsg;
+    private String note;
 }

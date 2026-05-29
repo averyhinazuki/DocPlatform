@@ -47,7 +47,7 @@ class InAppNotificationServiceTest {
         stubRedisson();
         stubUser();
 
-        inAppNotificationService.send(10L, List.of("user@test.com"), "Report ready", "doc-123");
+        inAppNotificationService.send(10L, List.of("user@test.com"), "Report ready", "doc-123", null);
 
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(captor.capture());
@@ -59,7 +59,7 @@ class InAppNotificationServiceTest {
         stubRedisson();
         stubUser();
 
-        inAppNotificationService.send(10L, List.of("user@test.com"), "Hello", null);
+        inAppNotificationService.send(10L, List.of("user@test.com"), "Hello", null, null);
 
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(captor.capture());

@@ -12,7 +12,10 @@
       </div>
       <div v-if="notifStore.unread.length === 0" class="empty">No unread notifications</div>
       <div v-for="n in notifStore.unread" :key="n.id" class="notif-item">
-        <span class="notif-msg">{{ n.message }}</span>
+        <div class="notif-content">
+          <span class="notif-msg">{{ n.message }}</span>
+          <span v-if="n.note" class="notif-note">{{ n.note }}</span>
+        </div>
         <button v-if="n.documentId" class="preview-btn" @click.stop="navigate(n.documentId)">
           Preview
         </button>
@@ -79,7 +82,9 @@ function navigate(documentId) {
   gap: 8px;
 }
 .notif-item:last-child { border-bottom: none; }
-.notif-msg { flex: 1; }
+.notif-content { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.notif-msg { }
+.notif-note { font-size: 12px; color: var(--text-2); font-style: italic; }
 .preview-btn {
   flex-shrink: 0;
   padding: 3px 10px;

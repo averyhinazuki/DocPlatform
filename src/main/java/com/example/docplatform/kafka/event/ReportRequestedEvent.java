@@ -12,5 +12,6 @@ public record ReportRequestedEvent(
     String templateId,
     Map<String, Object> params,
     List<String> recipients,
-    String triggeredBy
+    String triggeredBy,
+    String note
 ) {}

@@ -29,6 +29,7 @@
             <a v-if="presignedUrl" :href="presignedUrl" target="_blank" class="btn">
               Download
             </a>
+            <p v-if="selectedDoc.note" class="doc-note">{{ selectedDoc.note }}</p>
           </div>
 
           <div class="preview-body">
@@ -193,4 +194,5 @@ function relativeDate(iso) {
   font-size: 14px;
 }
 .error-msg { padding: 16px; color: #b91c1c; font-size: 13px; }
+.doc-note { font-size: 13px; color: var(--text-2); font-style: italic; margin: 6px 0 0; }
 </style>

@@ -38,7 +38,7 @@ public class ReportController {
             if (req.params() != null) merged.putAll(req.params());
             effectiveReq = new ReportRequest(
                 req.scheduleId(), req.reportType(), req.format(),
-                req.templateId(), merged, req.recipients(), req.assignmentId()
+                req.templateId(), merged, req.recipients(), req.assignmentId(), req.note()
             );
         }
 

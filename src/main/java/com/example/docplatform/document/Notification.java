@@ -17,4 +17,5 @@ public class Notification {
     private boolean read;
     private LocalDateTime createdAt;
     private String documentId;
+    private String note;
 }

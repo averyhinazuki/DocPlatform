@@ -30,6 +30,6 @@ public class NotificationConsumer {
         }
 
         String msg = "Report '" + event.templateName() + "' is ready from " + event.triggeredBy();
-        inAppService.send(event.tenantId(), event.recipients(), msg, event.documentId());
+        inAppService.send(event.tenantId(), event.recipients(), msg, event.documentId(), event.note());
     }
 }

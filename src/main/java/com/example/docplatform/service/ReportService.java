@@ -52,7 +52,7 @@ public class ReportService {
             producer.publishRequest(new ReportRequestedEvent(
                 doc.getId(), tenantId, req.scheduleId(),
                 req.reportType(), req.format().name(),
-                req.templateId(), req.params(), req.recipients(), triggeredBy
+                req.templateId(), req.params(), req.recipients(), triggeredBy, req.note()
             ));
 
             return doc.getId();
