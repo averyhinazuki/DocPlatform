@@ -14,9 +14,17 @@
           :class="{ selected: selectedId === doc.id }"
           @click="select(doc)"
         >
-          <span class="badge" :class="doc.fileFormat.toLowerCase()">{{ doc.fileFormat }}</span>
-          <span class="doc-status">{{ doc.status }}</span>
-          <span class="doc-date">{{ relativeDate(doc.generatedAt) }}</span>
+          <div class="doc-meta">
+            <span class="badge" :class="doc.fileFormat.toLowerCase()">{{ doc.fileFormat }}</span>
+            <span class="doc-status">{{ doc.status }}</span>
+            <span class="doc-date">{{ relativeDate(doc.generatedAt) }}</span>
+          </div>
+          <button
+            v-if="authStore.role === 'ADMIN'"
+            class="btn-remove"
+            title="Delete report"
+            @click.stop="remove(doc.id)"
+          >✕</button>
         </div>
       </div>
 
@@ -56,9 +64,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { listDocuments, getDownloadUrl } from '../api/files'
+import { listDocuments, getDownloadUrl, deleteDocument } from '../api/files'
+import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
+const authStore = useAuthStore()
 
 const documents = ref([])
 const loadingList = ref(true)
@@ -99,6 +109,21 @@ async function select(doc) {
   }
 }
 
+async function remove(id) {
+  if (!confirm('Delete this report? This cannot be undone.')) return
+  try {
+    await deleteDocument(id)
+    documents.value = documents.value.filter(d => d.id !== id)
+    if (selectedId.value === id) {
+      selectedDoc.value = null
+      selectedId.value = null
+      presignedUrl.value = ''
+    }
+  } catch {
+    // non-critical: list remains intact if delete fails
+  }
+}
+
 function relativeDate(iso) {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
@@ -133,8 +158,15 @@ function relativeDate(iso) {
   cursor: pointer;
   border-bottom: 1px solid var(--border);
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.doc-meta {
+  display: flex;
   flex-direction: column;
   gap: 4px;
+  flex: 1;
 }
 .doc-row:hover { background: var(--bg); }
 .doc-row.selected {
@@ -195,4 +227,10 @@ function relativeDate(iso) {
 }
 .error-msg { padding: 16px; color: #b91c1c; font-size: 13px; }
 .doc-note { font-size: 13px; color: var(--text-2); font-style: italic; margin: 6px 0 0; }
+.btn-remove {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 13px; padding: 2px 6px; border-radius: 4px;
+  line-height: 1; flex-shrink: 0;
+}
+.btn-remove:hover { background: #fee2e2; color: #dc2626; }
 </style>
