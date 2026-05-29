@@ -105,7 +105,7 @@
             <td>{{ s.name }}</td>
             <td><code>{{ s.cronExpr }}</code></td>
             <td>{{ s.format }}</td>
-            <td><span :class="['status-badge', s.status.toLowerCase()]">{{ s.status }}</span></td>
+            <td><span :class="['status-badge', s.status?.toLowerCase()]">{{ s.status }}</span></td>
             <td>{{ formatDate(s.nextRunAt) }}</td>
           </tr>
         </tbody>
@@ -287,6 +287,7 @@ async function submitSchedule() {
     }
     await createSchedule({ ...scheduleForm, cronExpr: cronExprComputed.value, params, recipients: selectedRecipients.value })
     createSuccess.value = true
+    createSuccess.value = false
     Object.assign(scheduleForm, { name: '', cronExpr: '', reportType: '', format: 'PDF', templateId: '' })
     selectedTemplateId.value = ''
     selectedRecipients.value = []
