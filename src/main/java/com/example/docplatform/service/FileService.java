@@ -4,6 +4,7 @@ import com.example.docplatform.document.GeneratedDocument;
 import com.example.docplatform.dto.file.DocumentSummary;
 import com.example.docplatform.enums.ReportStatus;
 import com.example.docplatform.exception.ResourceNotFoundException;
+import com.example.docplatform.exception.ResourceNotFoundException;
 import com.example.docplatform.exception.TenantAccessDeniedException;
 import com.example.docplatform.report.storage.DocumentStorageService;
 import com.example.docplatform.repository.GeneratedDocumentRepository;
@@ -24,6 +25,18 @@ public class FileService {
             .map(d -> new DocumentSummary(d.getId(), d.getFileFormat(), d.getStatus(),
                                          d.getGeneratedAt(), d.getScheduleId(), d.getNote()))
             .toList();
+    }
+
+    public void delete(Long tenantId, String documentId) throws Exception {
+        GeneratedDocument doc = documentRepository.findById(documentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
+
+        if (!doc.getTenantId().equals(tenantId)) {
+            throw new TenantAccessDeniedException("Access denied to document: " + documentId);
+        }
+
+        storageService.delete(doc.getMinioObjectKey());
+        documentRepository.deleteById(documentId);
     }
 
     public String getDownloadUrl(Long tenantId, String documentId) throws Exception {
