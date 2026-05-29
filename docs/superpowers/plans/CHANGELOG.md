@@ -2,6 +2,17 @@
 
 ---
 
+## 2026-05-29 — Merge Schedules into Assignments
+
+**Feature:** Schedules functionality (create schedule, view schedule list) is merged into the Assignments page. The Schedules nav link is removed. All users see the Assignments page. Admin-only sections (Assign Report Task, All Assignments) remain gated by role. `/schedules` redirects to `/assignments` for backward-compatibility.
+
+**Frontend files modified:**
+- `frontend/src/views/AssignmentsView.vue` — merged schedule sections; role-gated admin sections; form reset after success; null-safe status binding
+- `frontend/src/components/NavBar.vue` — removed Schedules link; removed admin guard on Assignments link
+- `frontend/src/router/index.js` — added `/schedules` redirect; removed SchedulesView import
+
+---
+
 ## 2026-05-29 — Report Preview & Document List
 
 **Feature:** Clicking a report-ready notification navigates to the Files page with the document auto-selected and previewed. PDF reports render inline; Excel/CSV show a format-fallback message. The Files page is redesigned as a split panel (document list on the left, preview on the right) replacing the manual ID lookup.
