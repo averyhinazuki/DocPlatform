@@ -12,7 +12,7 @@
         <div class="form-row" v-if="!assignmentMode">
           <div class="form-group">
             <label>Schedule ID</label>
-            <input v-model.number="form.scheduleId" type="number" placeholder="42" required />
+            <input v-model.number="form.scheduleId" type="number" placeholder="42 (optional)" />
           </div>
           <div class="form-group">
             <label>Format</label>
@@ -51,9 +51,14 @@
             <span v-if="tenantUsers.length === 0" class="hint">No users in this tenant.</span>
           </div>
         </div>
-        <div class="form-group">
-          <label>Params (JSON)</label>
-          <textarea v-model="paramsRaw" placeholder='{"region": "US"}'></textarea>
+        <div v-if="selectedTemplate?.variables?.length" class="form-group">
+          <label>Report Data</label>
+          <div class="params-grid">
+            <div v-for="v in selectedTemplate.variables" :key="v" class="param-row">
+              <label class="param-label">{{ humanize(v) }}</label>
+              <input type="text" v-model="paramsForm[v]" :placeholder="v" />
+            </div>
+          </div>
         </div>
         <button class="btn" type="submit" :disabled="loading">
           {{ loading ? 'Submitting…' : 'Generate Report' }}
@@ -92,15 +97,27 @@ const tenantUsers = ref([])
 const templates = ref([])
 const selectedTemplateId = ref('')
 const selectedTemplate = computed(() => templates.value.find(t => t.id === selectedTemplateId.value) ?? null)
-const paramsRaw = ref('')
+const paramsForm = reactive({})
 const loading = ref(false)
 const error = ref('')
 const documentId = ref('')
 
 watch(selectedTemplateId, id => {
   const t = templates.value.find(t => t.id === id)
-  if (t) { form.templateId = t.id; form.reportType = t.type }
+  if (t) {
+    form.templateId = t.id
+    form.reportType = t.type
+    Object.keys(paramsForm).forEach(k => delete paramsForm[k])
+    if (t.variables) t.variables.forEach(v => { paramsForm[v] = '' })
+  }
 })
+
+function humanize(key) {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, c => c.toUpperCase())
+}
 
 onMounted(async () => {
   try {
@@ -126,16 +143,7 @@ async function submit() {
   error.value = ''
   documentId.value = ''
   try {
-    let params = {}
-    if (paramsRaw.value.trim()) {
-      try {
-        params = JSON.parse(paramsRaw.value)
-      } catch {
-        error.value = 'Invalid JSON in Params field'
-        loading.value = false
-        return
-      }
-    }
+    const params = { ...paramsForm }
     const payload = {
       ...form,
       params,
@@ -175,4 +183,7 @@ async function submit() {
   word-break: break-all; margin-bottom: 8px;
 }
 .result-hint { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+.params-grid { display: flex; flex-direction: column; gap: 10px; }
+.param-row { display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 12px; }
+.param-label { font-size: 13px; color: var(--text-2); font-weight: 500; }
 </style>
