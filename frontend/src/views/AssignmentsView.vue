@@ -287,6 +287,14 @@ async function submitSchedule() {
     }
     await createSchedule({ ...scheduleForm, cronExpr: cronExprComputed.value, params, recipients: selectedRecipients.value })
     createSuccess.value = true
+    Object.assign(scheduleForm, { name: '', cronExpr: '', reportType: '', format: 'PDF', templateId: '' })
+    selectedTemplateId.value = ''
+    selectedRecipients.value = []
+    paramsRaw.value = ''
+    cronMode.value = 'daily'
+    cronHour.value = '8'
+    cronWeekday.value = 'MON'
+    cronMonthDay.value = '1'
     await loadSchedules()
   } catch (e) {
     createError.value = e.response?.data?.message ?? e.message ?? 'Failed to create schedule'
