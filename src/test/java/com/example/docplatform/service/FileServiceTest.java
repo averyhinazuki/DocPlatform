@@ -1,6 +1,8 @@
 package com.example.docplatform.service;
 
 import com.example.docplatform.document.GeneratedDocument;
+import com.example.docplatform.dto.file.DocumentSummary;
+import com.example.docplatform.enums.FileFormat;
 import com.example.docplatform.enums.ReportStatus;
 import com.example.docplatform.exception.TenantAccessDeniedException;
 import com.example.docplatform.report.storage.DocumentStorageService;
@@ -11,6 +13,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +40,33 @@ class FileServiceTest {
         String url = fileService.getDownloadUrl(1L, "doc-1");
 
         assertThat(url).isEqualTo("http://minio/signed");
+    }
+
+    @Test
+    void listByTenant_returnsMappedSummaries() {
+        GeneratedDocument doc = new GeneratedDocument();
+        doc.setId("doc-1");
+        doc.setFileFormat(FileFormat.PDF);
+        doc.setStatus(ReportStatus.COMPLETED);
+        doc.setGeneratedAt(LocalDateTime.of(2026, 5, 29, 10, 0));
+        doc.setScheduleId(42L);
+
+        when(documentRepository.findByTenantIdOrderByGeneratedAtDesc(1L)).thenReturn(List.of(doc));
+
+        List<DocumentSummary> result = fileService.listByTenant(1L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).id()).isEqualTo("doc-1");
+        assertThat(result.get(0).fileFormat()).isEqualTo(FileFormat.PDF);
+        assertThat(result.get(0).status()).isEqualTo(ReportStatus.COMPLETED);
+        assertThat(result.get(0).generatedAt()).isEqualTo(LocalDateTime.of(2026, 5, 29, 10, 0));
+        assertThat(result.get(0).scheduleId()).isEqualTo(42L);
+    }
+
+    @Test
+    void listByTenant_returnsEmptyListWhenNoDocs() {
+        when(documentRepository.findByTenantIdOrderByGeneratedAtDesc(1L)).thenReturn(List.of());
+        assertThat(fileService.listByTenant(1L)).isEmpty();
     }
 
     @Test

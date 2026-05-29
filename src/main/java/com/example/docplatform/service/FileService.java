@@ -1,6 +1,7 @@
 package com.example.docplatform.service;
 
 import com.example.docplatform.document.GeneratedDocument;
+import com.example.docplatform.dto.file.DocumentSummary;
 import com.example.docplatform.enums.ReportStatus;
 import com.example.docplatform.exception.ResourceNotFoundException;
 import com.example.docplatform.exception.TenantAccessDeniedException;
@@ -9,12 +10,21 @@ import com.example.docplatform.repository.GeneratedDocumentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class FileService {
 
     private final GeneratedDocumentRepository documentRepository;
     private final DocumentStorageService storageService;
+
+    public List<DocumentSummary> listByTenant(Long tenantId) {
+        return documentRepository.findByTenantIdOrderByGeneratedAtDesc(tenantId).stream()
+            .map(d -> new DocumentSummary(d.getId(), d.getFileFormat(), d.getStatus(),
+                                         d.getGeneratedAt(), d.getScheduleId()))
+            .toList();
+    }
 
     public String getDownloadUrl(Long tenantId, String documentId) throws Exception {
         GeneratedDocument doc = documentRepository.findById(documentId)
