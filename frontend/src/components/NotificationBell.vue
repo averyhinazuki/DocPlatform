@@ -11,11 +11,11 @@
         <span>Notifications</span>
       </div>
       <div v-if="notifStore.unread.length === 0" class="empty">No unread notifications</div>
-      <div v-for="n in notifStore.unread" :key="n.id"
-           class="notif-item"
-           :class="{ clickable: n.documentId }"
-           @click="n.documentId && navigate(n.documentId)">
-        {{ n.message }}
+      <div v-for="n in notifStore.unread" :key="n.id" class="notif-item">
+        <span class="notif-msg">{{ n.message }}</span>
+        <button v-if="n.documentId" class="preview-btn" @click.stop="navigate(n.documentId)">
+          Preview
+        </button>
       </div>
     </div>
   </div>
@@ -70,8 +70,26 @@ function navigate(documentId) {
   color: var(--text-2);
 }
 .empty { padding: 16px; color: var(--text-2); font-size: 13px; text-align: center; }
-.notif-item { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.notif-item {
+  padding: 10px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .notif-item:last-child { border-bottom: none; }
-.notif-item.clickable { cursor: pointer; }
-.notif-item.clickable:hover { background: var(--bg); }
+.notif-msg { flex: 1; }
+.preview-btn {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.preview-btn:hover { background: var(--accent); color: white; }
 </style>
