@@ -1,5 +1,18 @@
 # DocPlatform Changelog
 
+## 2026-06-04 — GitHub Actions CI Pipeline
+
+**Feature:** Added a CI pipeline via GitHub Actions. Two jobs run in parallel on every push and PR to `main`: `backend` (runs `mvn test` on Java 21/Temurin with Maven dependency caching) and `frontend` (runs `npm ci && npm run build` on Node 20 with npm cache). A README with a live CI badge was added to the repo root. `UserMapperTest` was removed as it required a real MySQL connection and was a manual dev test, not a unit test.
+
+**Files created:**
+- `.github/workflows/ci.yml` — GitHub Actions workflow (backend + frontend parallel jobs)
+- `README.md` — project README with CI badge, stack summary, and feature list
+
+**Files removed:**
+- `src/test/java/com/example/docplatform/mapper/UserMapperTest.java` — manual integration test, not suitable for CI
+
+---
+
 ## 2026-06-04 — Real-Time Notifications via SSE + Redis Pub/Sub
 
 **Feature:** Replaced 15-second `NotificationBell` polling with real-time server push. `InAppNotificationService` now publishes a JSON notification payload to a user-scoped Redisson topic (`notifications:{tenantId}:{userId}`), fixing the previous tenant-scoped bug where any push would have reached all users in the tenant. A new `SseController` subscribes an `RTopic` listener per connected user and streams events via Spring `SseEmitter`. The frontend `NotificationBell.vue` opens a native `EventSource` on mount and drops the `setInterval` poll; the notification store's `connect()` / `disconnect()` methods manage the connection lifecycle. On `EventSource` error, a single `fetch()` call resyncs state without re-establishing a polling loop. The existing `GET /api/notifications` REST endpoint is kept for initial page-load hydration.
