@@ -32,14 +32,13 @@ import { useNotificationStore } from '../stores/notifications'
 const notifStore = useNotificationStore()
 const router = useRouter()
 const open = ref(false)
-let pollInterval = null
 
 onMounted(() => {
   notifStore.fetch().catch(() => {})
-  pollInterval = setInterval(() => notifStore.fetch().catch(() => {}), 15000)
+  notifStore.connect()
 })
 
-onUnmounted(() => clearInterval(pollInterval))
+onUnmounted(() => notifStore.disconnect())
 
 function toggle() { open.value = !open.value }
 
