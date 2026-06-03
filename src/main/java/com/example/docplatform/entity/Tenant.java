@@ -14,6 +14,5 @@ public class Tenant {
     private String name;
     private String slug;
     private String plan;
-    private Integer concurrentJobLimit;
     private LocalDateTime createdAt;
 }

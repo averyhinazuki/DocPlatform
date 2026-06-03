@@ -38,7 +38,10 @@ public class TenantService {
     public int getLimit(Long tenantId) {
         Tenant t = tenantMapper.selectById(tenantId);
         if (t == null) throw new IllegalStateException("Tenant not found: " + tenantId);
-        return t.getConcurrentJobLimit();
+        return switch (t.getPlan()) {
+            case "PREMIUM" -> 10;
+            default -> 3;
+        };
     }
 
     private TenantResponse toResponse(Tenant t) {

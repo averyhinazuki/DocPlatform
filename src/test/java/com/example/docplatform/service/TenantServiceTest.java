@@ -49,13 +49,23 @@ class TenantServiceTest {
     }
 
     @Test
-    void getLimit_returnsConcurrentJobLimit() {
+    void getLimit_returns3ForFreePlan() {
         Tenant t = new Tenant();
         t.setId(1L);
-        t.setConcurrentJobLimit(5);
+        t.setPlan("FREE");
         when(tenantMapper.selectById(1L)).thenReturn(t);
 
-        assertThat(tenantService.getLimit(1L)).isEqualTo(5);
+        assertThat(tenantService.getLimit(1L)).isEqualTo(3);
+    }
+
+    @Test
+    void getLimit_returns10ForPremiumPlan() {
+        Tenant t = new Tenant();
+        t.setId(2L);
+        t.setPlan("PREMIUM");
+        when(tenantMapper.selectById(2L)).thenReturn(t);
+
+        assertThat(tenantService.getLimit(2L)).isEqualTo(10);
     }
 
     @Test
