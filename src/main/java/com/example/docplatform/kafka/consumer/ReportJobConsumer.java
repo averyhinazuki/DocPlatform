@@ -11,6 +11,7 @@ import com.example.docplatform.report.generator.ReportGenerator;
 import com.example.docplatform.report.storage.DocumentStorageService;
 import com.example.docplatform.repository.GeneratedDocumentRepository;
 import com.example.docplatform.repository.ReportTemplateRepository;
+import com.example.docplatform.service.QuotaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -29,6 +30,7 @@ public class ReportJobConsumer {
     private final DocumentStorageService storageService;
     private final GeneratedDocumentRepository documentRepository;
     private final ReportJobProducer producer;
+    private final QuotaService quotaService;
 
     @KafkaListener(topics = "report.requested", groupId = "docplatform-group")
     public void consume(ReportRequestedEvent event) {
@@ -78,6 +80,8 @@ public class ReportJobConsumer {
             doc.setStatus(ReportStatus.FAILED);
             doc.setErrorMsg(e.getMessage());
             documentRepository.save(doc);
+        } finally {
+            quotaService.release(event.tenantId());
         }
     }
 }
