@@ -1,5 +1,28 @@
 # DocPlatform Changelog
 
+## 2026-06-04 — Real-Time Notifications via SSE + Redis Pub/Sub
+
+**Feature:** Replaced 15-second `NotificationBell` polling with real-time server push. `InAppNotificationService` now publishes a JSON notification payload to a user-scoped Redisson topic (`notifications:{tenantId}:{userId}`), fixing the previous tenant-scoped bug where any push would have reached all users in the tenant. A new `SseController` subscribes an `RTopic` listener per connected user and streams events via Spring `SseEmitter`. The frontend `NotificationBell.vue` opens a native `EventSource` on mount and drops the `setInterval` poll; the notification store's `connect()` / `disconnect()` methods manage the connection lifecycle. On `EventSource` error, a single `fetch()` call resyncs state without re-establishing a polling loop. The existing `GET /api/notifications` REST endpoint is kept for initial page-load hydration.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/notification/InAppNotificationService.java` — added `ObjectMapper` dependency; user-scoped topic key; JSON payload (`id`, `message`, `note`, `documentId`) instead of plain string
+
+**Backend files created:**
+- `src/main/java/com/example/docplatform/controller/SseController.java` — `GET /api/notifications/stream`; RTopic listener registered per emitter; cleanup on completion/timeout/error
+
+**Tests modified:**
+- `src/test/java/com/example/docplatform/notification/InAppNotificationServiceTest.java` — updated to verify user-scoped topic key and JSON publish
+- `src/test/java/com/example/docplatform/service/InAppNotificationServiceTest.java` — added `ObjectMapper` mock
+
+**Tests created:**
+- `src/test/java/com/example/docplatform/controller/SseControllerTest.java` — 2 tests: user-scoped topic registration, message forwarding
+
+**Frontend files modified:**
+- `frontend/src/stores/notifications.js` — added `connect()`, `disconnect()`, `EventSource` handling
+- `frontend/src/components/NotificationBell.vue` — replaced `setInterval` with `notifStore.connect()` / `notifStore.disconnect()`
+
+---
+
 ## 2026-06-03 — Exactly-Once Report Delivery
 
 **Feature:** `ReportJobConsumer` now performs a two-phase MongoDB write to prevent duplicate report generation on Kafka retry. After `storageService.upload()` succeeds, `minioObjectKey` is immediately persisted to MongoDB while status stays `IN_PROGRESS` (Phase 1). The COMPLETED status and `ReportCompletedEvent` are then written in Phase 2. On any Kafka retry, the consumer checks `doc.minioObjectKey` first — if set, it skips regeneration entirely and calls `completeAndPublish()` with the existing key (re-publishes notification). If `doc.status == COMPLETED`, it exits silently with no quota release (quota was already released in the prior run's `finally` block). The skip-path mirrors the normal path's error handling: exceptions mark the doc FAILED and still release the quota.
