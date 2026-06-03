@@ -34,12 +34,33 @@ public class ReportJobConsumer {
 
     @KafkaListener(topics = "report.requested", groupId = "docplatform-group")
     public void consume(ReportRequestedEvent event) {
-        GeneratedDocument doc = documentRepository.findById(event.documentId()).orElseThrow();
+        GeneratedDocument doc = documentRepository.findById(event.documentId()).orElseThrow(() -> new IllegalStateException("Document not found: " + event.documentId()));
+
+        // Already fully processed — silent skip, quota already released in prior run
+        if (doc.getStatus() == ReportStatus.COMPLETED) {
+            return;
+        }
+
+        // MinIO upload succeeded in a prior attempt but COMPLETED save was lost (crash between phases)
+        if (doc.getMinioObjectKey() != null) {
+            try {
+                ReportTemplate template = templateRepository.findById(event.templateId()).orElseThrow(() -> new IllegalStateException("Template not found: " + event.templateId()));
+                completeAndPublish(doc, event, template.getName());
+            } catch (Exception e) {
+                doc.setStatus(ReportStatus.FAILED);
+                doc.setErrorMsg(e.getMessage());
+                documentRepository.save(doc);
+            } finally {
+                quotaService.release(event.tenantId());
+            }
+            return;
+        }
+
         doc.setStatus(ReportStatus.IN_PROGRESS);
         documentRepository.save(doc);
 
         try {
-            ReportTemplate template = templateRepository.findById(event.templateId()).orElseThrow();
+            ReportTemplate template = templateRepository.findById(event.templateId()).orElseThrow(() -> new IllegalStateException("Template not found: " + event.templateId()));
 
             ReportGenerator generator = generators.stream()
                 .filter(g -> g.supportedFormat().name().equals(event.fileFormat()))
@@ -64,17 +85,12 @@ public class ReportJobConsumer {
                 event.tenantId(), template.getName() + "." + event.fileFormat().toLowerCase(),
                 content, contentType);
 
-            doc.setStatus(ReportStatus.COMPLETED);
+            // Phase 1: persist objectKey before marking COMPLETED (idempotency guard)
             doc.setMinioBucket("reports");
             doc.setMinioObjectKey(objectKey);
-            doc.setNote(event.note());
-            doc.setDeliveredAt(LocalDateTime.now());
             documentRepository.save(doc);
 
-            producer.publishCompleted(new ReportCompletedEvent(
-                doc.getId(), event.tenantId(), objectKey, "reports",
-                event.fileFormat(), event.recipients(),
-                template.getName(), event.triggeredBy(), event.note()));
+            completeAndPublish(doc, event, template.getName());
 
         } catch (Exception e) {
             doc.setStatus(ReportStatus.FAILED);
@@ -83,5 +99,17 @@ public class ReportJobConsumer {
         } finally {
             quotaService.release(event.tenantId());
         }
+    }
+
+    private void completeAndPublish(GeneratedDocument doc, ReportRequestedEvent event, String templateName) {
+        doc.setStatus(ReportStatus.COMPLETED);
+        doc.setNote(event.note());
+        doc.setDeliveredAt(LocalDateTime.now());
+        documentRepository.save(doc);
+
+        producer.publishCompleted(new ReportCompletedEvent(
+            doc.getId(), event.tenantId(), doc.getMinioObjectKey(), "reports",
+            event.fileFormat(), event.recipients(),
+            templateName, event.triggeredBy(), event.note()));
     }
 }

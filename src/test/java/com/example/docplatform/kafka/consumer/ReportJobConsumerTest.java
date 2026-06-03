@@ -1,0 +1,137 @@
+package com.example.docplatform.kafka.consumer;
+
+import com.example.docplatform.document.GeneratedDocument;
+import com.example.docplatform.document.ReportTemplate;
+import com.example.docplatform.enums.FileFormat;
+import com.example.docplatform.enums.ReportStatus;
+import com.example.docplatform.kafka.event.ReportCompletedEvent;
+import com.example.docplatform.kafka.event.ReportRequestedEvent;
+import com.example.docplatform.kafka.producer.ReportJobProducer;
+import com.example.docplatform.report.generator.PdfReportGenerator;
+import com.example.docplatform.report.storage.DocumentStorageService;
+import com.example.docplatform.repository.GeneratedDocumentRepository;
+import com.example.docplatform.repository.ReportTemplateRepository;
+import com.example.docplatform.service.QuotaService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ReportJobConsumerTest {
+
+    @Mock PdfReportGenerator generator;
+    @Mock ReportTemplateRepository templateRepository;
+    @Mock DocumentStorageService storageService;
+    @Mock GeneratedDocumentRepository documentRepository;
+    @Mock ReportJobProducer producer;
+    @Mock QuotaService quotaService;
+
+    ReportJobConsumer consumer;
+
+    @BeforeEach
+    void setUp() {
+        consumer = new ReportJobConsumer(
+            List.of(generator), templateRepository, storageService,
+            documentRepository, producer, quotaService
+        );
+    }
+
+    private ReportRequestedEvent event(String documentId, String templateId, Long tenantId) {
+        return new ReportRequestedEvent(
+            documentId, tenantId, null, "SALES", "PDF",
+            templateId, Map.of(), List.of(), "alice", null, null
+        );
+    }
+
+    @Test
+    void skipPath_republishesCompletedEventWhenMinioKeyAlreadySet() throws Exception {
+        GeneratedDocument doc = new GeneratedDocument();
+        doc.setId("doc-1");
+        doc.setTenantId(1L);
+        doc.setStatus(ReportStatus.IN_PROGRESS);
+        doc.setMinioObjectKey("reports/1/existing.pdf");
+        doc.setMinioBucket("reports");
+        when(documentRepository.findById("doc-1")).thenReturn(Optional.of(doc));
+
+        ReportTemplate template = new ReportTemplate();
+        template.setName("Sales");
+        when(templateRepository.findById("tmpl-1")).thenReturn(Optional.of(template));
+        when(documentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        consumer.consume(event("doc-1", "tmpl-1", 1L));
+
+        verify(generator, never()).generate(any(), any());
+        verify(producer).publishCompleted(
+            argThat(e -> "reports/1/existing.pdf".equals(e.minioObjectKey())));
+        verify(quotaService).release(1L);
+    }
+
+    @Test
+    void skipPath_silentlyExitsWhenAlreadyCompleted() throws Exception {
+        GeneratedDocument doc = new GeneratedDocument();
+        doc.setId("doc-1");
+        doc.setTenantId(1L);
+        doc.setStatus(ReportStatus.COMPLETED);
+        doc.setMinioObjectKey("reports/1/done.pdf");
+        when(documentRepository.findById("doc-1")).thenReturn(Optional.of(doc));
+
+        consumer.consume(event("doc-1", "tmpl-1", 1L));
+
+        verify(generator, never()).generate(any(), any());
+        verify(producer, never()).publishCompleted(any());
+        verify(quotaService, never()).release(any());
+    }
+
+    @Test
+    void normalPath_savesObjectKeyBeforeMarkingCompleted() throws Exception {
+        GeneratedDocument doc = new GeneratedDocument();
+        doc.setId("doc-1");
+        doc.setTenantId(1L);
+        doc.setStatus(ReportStatus.PENDING);
+        when(documentRepository.findById("doc-1")).thenReturn(Optional.of(doc));
+
+        ReportTemplate template = new ReportTemplate();
+        template.setName("Sales");
+        when(templateRepository.findById("tmpl-1")).thenReturn(Optional.of(template));
+        when(generator.supportedFormat()).thenReturn(FileFormat.PDF);
+        when(generator.generate(any(), any())).thenReturn(new byte[]{1, 2, 3});
+        when(storageService.upload(anyLong(), anyString(), any(), anyString()))
+            .thenReturn("reports/1/new.pdf");
+
+        List<ReportStatus> savedStatuses = new ArrayList<>();
+        List<String> savedKeys = new ArrayList<>();
+        when(documentRepository.save(any())).thenAnswer(inv -> {
+            GeneratedDocument d = inv.getArgument(0);
+            savedStatuses.add(d.getStatus());
+            savedKeys.add(d.getMinioObjectKey());
+            return d;
+        });
+
+        consumer.consume(event("doc-1", "tmpl-1", 1L));
+
+        // save[0] = IN_PROGRESS (no objectKey yet)
+        // save[1] = Phase 1: objectKey persisted, status still IN_PROGRESS
+        // save[2] = Phase 2: COMPLETED
+        assertThat(savedStatuses.get(1)).isEqualTo(ReportStatus.IN_PROGRESS);
+        assertThat(savedKeys.get(1)).isEqualTo("reports/1/new.pdf");
+        assertThat(savedStatuses.get(2)).isEqualTo(ReportStatus.COMPLETED);
+        verify(producer).publishCompleted(any(ReportCompletedEvent.class));
+        verify(quotaService).release(1L);
+    }
+}
