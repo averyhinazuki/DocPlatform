@@ -47,4 +47,22 @@ class TenantServiceTest {
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("Slug already taken");
     }
+
+    @Test
+    void getLimit_returnsConcurrentJobLimit() {
+        Tenant t = new Tenant();
+        t.setId(1L);
+        t.setConcurrentJobLimit(5);
+        when(tenantMapper.selectById(1L)).thenReturn(t);
+
+        assertThat(tenantService.getLimit(1L)).isEqualTo(5);
+    }
+
+    @Test
+    void getLimit_throwsWhenTenantNotFound() {
+        when(tenantMapper.selectById(99L)).thenReturn(null);
+
+        assertThatThrownBy(() -> tenantService.getLimit(99L))
+            .isInstanceOf(IllegalStateException.class);
+    }
 }

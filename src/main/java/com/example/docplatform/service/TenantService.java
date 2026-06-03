@@ -35,6 +35,12 @@ public class TenantService {
         return tenantMapper.selectList(null).stream().map(this::toResponse).toList();
     }
 
+    public int getLimit(Long tenantId) {
+        Tenant t = tenantMapper.selectById(tenantId);
+        if (t == null) throw new IllegalStateException("Tenant not found: " + tenantId);
+        return t.getConcurrentJobLimit();
+    }
+
     private TenantResponse toResponse(Tenant t) {
         return new TenantResponse(t.getId(), t.getName(), t.getSlug(), t.getPlan(), t.getCreatedAt());
     }
