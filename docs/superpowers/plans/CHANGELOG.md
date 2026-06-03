@@ -1,5 +1,15 @@
 # DocPlatform Changelog
 
+## 2026-06-03 — Exactly-Once Report Delivery
+
+**Feature:** `ReportJobConsumer` now performs a two-phase MongoDB write to prevent duplicate report generation on Kafka retry. After `storageService.upload()` succeeds, `minioObjectKey` is immediately persisted to MongoDB while status stays `IN_PROGRESS` (Phase 1). The COMPLETED status and `ReportCompletedEvent` are then written in Phase 2. On any Kafka retry, the consumer checks `doc.minioObjectKey` first — if set, it skips regeneration entirely and calls `completeAndPublish()` with the existing key (re-publishes notification). If `doc.status == COMPLETED`, it exits silently with no quota release (quota was already released in the prior run's `finally` block). The skip-path mirrors the normal path's error handling: exceptions mark the doc FAILED and still release the quota.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/kafka/consumer/ReportJobConsumer.java` — two early-exit checks; Phase 1 save after MinIO upload; `completeAndPublish()` private helper extracted; skip-path try-catch-finally mirrors normal path; descriptive `orElseThrow()` messages
+
+**Tests created:**
+- `src/test/java/com/example/docplatform/kafka/consumer/ReportJobConsumerTest.java` — 3 tests: skip path (minioObjectKey set), skip path (already COMPLETED), normal path save ordering
+
 ---
 
 ## 2026-06-03 — Tenant Concurrency Quota
