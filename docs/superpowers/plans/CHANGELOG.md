@@ -2,6 +2,148 @@
 
 ---
 
+## 2026-06-03 — Tenant Concurrency Quota
+
+**Feature:** Each tenant has a `concurrent_job_limit` (default 3) in the `tenants` table. When a user submits a report, `ReportController` reads the limit via `TenantService.getLimit()` then calls `QuotaService.acquire(tenantId, limit)`, which atomically increments a Redis counter (`tenant:{id}:running`). Requests beyond the limit get HTTP 429 ("Concurrent report limit reached. Upgrade your plan."). The counter is decremented in `ReportJobConsumer`'s `finally` block (success or failure), and also released in `ReportController`'s catch block if the Kafka publish itself fails. A 3600-second TTL is set when the counter first goes from 0→1 as a safety valve against consumer crashes.
+
+**DB migration (run once):**
+```sql
+ALTER TABLE tenants ADD COLUMN concurrent_job_limit INT NOT NULL DEFAULT 3;
+```
+
+**Backend files created:**
+- `src/main/java/com/example/docplatform/exception/TenantQuotaExceededException.java`
+- `src/main/java/com/example/docplatform/service/QuotaService.java`
+
+**Backend files modified:**
+- `src/main/resources/schema.sql` — added `concurrent_job_limit` to `tenants`
+- `src/main/java/com/example/docplatform/entity/Tenant.java` — added `concurrentJobLimit` field
+- `src/main/java/com/example/docplatform/service/TenantService.java` — added `getLimit(tenantId)`
+- `src/main/java/com/example/docplatform/controller/ReportController.java` — quota acquire before Kafka; release on publish failure
+- `src/main/java/com/example/docplatform/kafka/consumer/ReportJobConsumer.java` — quota release in `finally`
+
+**Tests created:**
+- `src/test/java/com/example/docplatform/service/TenantServiceTest.java` — 2 new tests (getLimit)
+- `src/test/java/com/example/docplatform/service/QuotaServiceTest.java` — 6 tests
+- `src/test/java/com/example/docplatform/controller/ReportControllerTest.java` — 2 tests
+
+---
+
+## 2026-05-31 — Report History: Preview and Delete actions
+
+**Feature:** In the Report History table on the Reports page, "Download" is replaced by "Preview" (navigates to `/files?docId=<id>` so the doc is auto-selected in FilesView). A ✕ Delete button is added next to every row — users can delete their own reports; admins can delete any report in the tenant.
+
+**Backend:** `DELETE /api/files/{documentId}` is no longer admin-only. The service checks tenant ownership first, then allows the delete if the caller is an admin or is the document's owner. Non-owners get `TenantAccessDeniedException`.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/service/FileService.java` — `delete()` now accepts `callerId` + `isAdmin`; enforces owner-or-admin rule
+- `src/main/java/com/example/docplatform/controller/FileController.java` — removed `@PreAuthorize("hasRole('ADMIN')")`, passes caller info to service
+
+**Frontend files modified:**
+- `frontend/src/views/ReportsView.vue` — Download→Preview button, ✕ Delete button; imports `useRouter`, `deleteDocument`, `useAuthStore`
+
+**Tests modified:**
+- `src/test/java/com/example/docplatform/service/FileServiceTest.java` — updated 4 existing delete tests; added `ownerCanDeleteOwnDoc` and `nonOwnerUserCannotDeleteOtherDoc`
+
+---
+
+## 2026-05-31 — Schedule: delete button
+
+**Feature:** Admins see a ✕ button on each row of the Schedules table. Clicking it confirms then calls `DELETE /api/schedules/{id}` (admin-only, tenant-scoped) and removes the row immediately.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/service/ScheduleService.java` — added `delete(id, tenantId)` with tenant guard
+- `src/main/java/com/example/docplatform/controller/ScheduleController.java` — added `DELETE /api/schedules/{id}` (`@PreAuthorize("hasRole('ADMIN')")`)
+
+**Frontend files modified:**
+- `frontend/src/api/schedules.js` — added `deleteSchedule(id)`
+- `frontend/src/views/AssignmentsView.vue` — ✕ button (admin-only) + `removeSchedule()` handler
+
+---
+
+## 2026-05-31 — Schedule: notify-to-generate flow (assignments instead of auto-generate)
+
+**Feature:** Schedules no longer auto-generate reports. When a schedule fires, it creates one `ReportAssignment` per recipient (resolved by username within the tenant). Recipients see the pending assignment on their Dashboard and Assignments page, click "Generate Report", and fill in content or upload a data file themselves. The schedule's name and preferred format are passed as the assignment notes.
+
+The `report_schedules` table gains a `created_by` column so scheduled assignments can be attributed to the schedule creator. Schedules with `created_by = 0` (pre-migration or legacy) are skipped with a warning log.
+
+**DB migration (run once):**
+```sql
+ALTER TABLE report_schedules ADD COLUMN created_by BIGINT NOT NULL DEFAULT 0;
+```
+
+**Backend files modified:**
+- `src/main/resources/schema.sql` — added `created_by` to `report_schedules`
+- `src/main/java/com/example/docplatform/entity/ReportSchedule.java` — added `Long createdBy`
+- `src/main/java/com/example/docplatform/service/ScheduleService.java` — `create()` accepts `Long createdBy`
+- `src/main/java/com/example/docplatform/controller/ScheduleController.java` — passes `user.userId()` to service
+- `src/main/java/com/example/docplatform/service/UserService.java` — added `findByUsername(tenantId, username)`
+- `src/main/java/com/example/docplatform/scheduler/ReportScheduler.java` — replaced `requestReport()` with `assignmentService.create()` per recipient; removed `ReportService` dependency
+
+---
+
+## 2026-05-31 — Fix: Scheduler never fires — tenant plugin filters to tenant_id=0
+
+**Bug:** `ReportScheduler` runs outside any HTTP request, so `TenantContextHolder.getTenantId()` returns `null`. `MyBatisPlusConfig` fell back to `0L`, rewriting every MyBatis-Plus query to `WHERE tenant_id = 0`. `findDueSchedules()` always returned an empty list, so no schedule ever triggered regardless of `next_run_at`.
+
+**Fix:** Added `report_schedules` to `TENANT_EXEMPT`. `ScheduleService.findDueSchedules()` needs to scan all tenants; all other `ScheduleService` methods already manually apply `eq(tenantId)` so the plugin filter was redundant there too.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/config/MyBatisPlusConfig.java` — added `"report_schedules"` to `TENANT_EXEMPT`
+
+---
+
+## 2026-05-31 — Fix: PDF generation fails on void elements (br, hr, img)
+
+**Bug:** openhtmltopdf parses HTML as XHTML, so `<br>`, `<hr>`, `<img>` etc. must be self-closed (`<br/>`). Quill and Thymeleaf templates emit standard HTML void elements, causing a `SAXParseException: The element type "br" must be terminated by the matching end-tag`.
+
+**Fix:** `PdfReportGenerator` now runs `toXhtml()` on the HTML string before handing it to the renderer. The method uses a regex to self-close all void elements that aren't already closed (`<br>` → `<br/>`, `<hr>` → `<hr/>`, `<img src="...">` → `<img src="..."/>`), with a negative lookbehind on `/` to skip already-valid tags.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/report/generator/PdfReportGenerator.java` — added `VOID_TAGS` pattern + `toXhtml()` helper; applied before `builder.withHtmlContent()`
+
+---
+
+## 2026-05-31 — Report History on Reports page
+
+**Feature:** A "Report History" table appears below the Generate Report form. It lists the caller's previously generated reports (format badge, status chip, note, relative date) and shows a Download button for completed reports. The list loads on mount and refreshes automatically after a successful submit. A manual Refresh button is also available.
+
+**Frontend files modified:**
+- `frontend/src/views/ReportsView.vue` — added history card, `loadHistory()`, `download()`, `relativeDate()`, status/format badge styles
+
+---
+
+## 2026-05-31 — Users see their own report records
+
+**Feature:** Regular users now see only their own generated reports on the Files page. Admins continue to see all reports in the tenant. `GeneratedDocument` gains a `userId` field set when a report is triggered via the API (scheduler-triggered reports have `null` userId and are admin-visible only). `GET /api/files` branches on role: `ADMIN` → full tenant list, `USER` → caller's docs only. No frontend changes needed.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/document/GeneratedDocument.java` — added `@Indexed Long userId`
+- `src/main/java/com/example/docplatform/repository/GeneratedDocumentRepository.java` — added `findByTenantIdAndUserIdOrderByGeneratedAtDesc`
+- `src/main/java/com/example/docplatform/service/ReportService.java` — `requestReport` accepts `Long userId`, sets it on the doc
+- `src/main/java/com/example/docplatform/controller/ReportController.java` — passes `user.userId()` to `requestReport`
+- `src/main/java/com/example/docplatform/scheduler/ReportScheduler.java` — passes `null` userId to `requestReport`
+- `src/main/java/com/example/docplatform/service/FileService.java` — added `listByUser(tenantId, userId)`
+- `src/main/java/com/example/docplatform/controller/FileController.java` — role-branched list endpoint
+
+**Tests modified:**
+- `src/test/java/com/example/docplatform/service/ReportServiceTest.java` — updated 2 calls to 4-arg `requestReport`
+- `src/test/java/com/example/docplatform/service/FileServiceTest.java` — added `listByUser_returnsOnlyCallerDocs`
+
+---
+
+## 2026-05-31 — Admin: Inline role editing in Users table
+
+**Feature:** The Admin page now shows a single "Users" card listing all users in the admin's tenant. Each row has an inline Role dropdown and a Save button that updates that user's role in place. The Save button is disabled when the selected value matches the current role. A 2-second "Saved" confirmation appears per row on success. The separate "Update User Role" card is removed. The `GET /api/users` response now includes the `role` field.
+
+**Backend files modified:**
+- `src/main/java/com/example/docplatform/controller/AdminController.java` — added `role` to the `listUsers` map projection
+
+**Frontend files modified:**
+- `frontend/src/views/AdminView.vue` — replaced Tenants card and standalone role form with a single Users table with per-row inline role select + Save
+
+---
+
 ## 2026-05-29 — Admin File Delete
 
 **Feature:** Admins can delete a generated document from the Files page. A `✕` button appears in each row of the document list (admin-only, using `authStore.role === 'ADMIN'`). Clicking it shows a confirmation prompt, then calls `DELETE /api/files/{documentId}`. The backend removes the MinIO object first, then deletes the MongoDB record — both scoped to the caller's tenant. The deleted entry is removed from the list immediately; if it was selected, the preview panel clears.
