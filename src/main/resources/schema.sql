@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   name VARCHAR(255) NOT NULL,
   slug VARCHAR(100) UNIQUE NOT NULL,
   plan VARCHAR(50) DEFAULT 'FREE',
+  concurrent_job_limit INT NOT NULL DEFAULT 3,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS report_schedules (
   template_id VARCHAR(100) NOT NULL,
   recipients JSON,
   params JSON,
+  created_by BIGINT NOT NULL DEFAULT 0,
   status ENUM('ACTIVE','PAUSED') DEFAULT 'ACTIVE',
   last_run_at DATETIME,
   next_run_at DATETIME
