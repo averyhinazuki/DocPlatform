@@ -98,6 +98,7 @@
         <thead>
           <tr>
             <th>Name</th><th>Cron</th><th>Format</th><th>Status</th><th>Next Run</th>
+            <th v-if="authStore.role === 'ADMIN'"></th>
           </tr>
         </thead>
         <tbody>
@@ -107,6 +108,9 @@
             <td>{{ s.format }}</td>
             <td><span :class="['status-badge', s.status?.toLowerCase()]">{{ s.status }}</span></td>
             <td>{{ formatDate(s.nextRunAt) }}</td>
+            <td v-if="authStore.role === 'ADMIN'">
+              <button class="btn-remove" title="Delete schedule" @click="removeSchedule(s.id)">✕</button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -176,7 +180,7 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import { listSchedules, createSchedule } from '../api/schedules'
+import { listSchedules, createSchedule, deleteSchedule } from '../api/schedules'
 import { listUsers } from '../api/users'
 import { listTemplates } from '../api/templates'
 import { createAssignment, listAssignments } from '../api/assignments'
@@ -323,6 +327,16 @@ async function submitAssignment() {
   }
 }
 
+async function removeSchedule(id) {
+  if (!confirm('Delete this schedule? This cannot be undone.')) return
+  try {
+    await deleteSchedule(id)
+    schedules.value = schedules.value.filter(s => s.id !== id)
+  } catch {
+    // non-critical
+  }
+}
+
 function formatHour(h) {
   if (h === 0) return '12 AM'
   if (h < 12) return `${h} AM`
@@ -353,4 +367,9 @@ code { font-size: 12px; background: var(--bg); padding: 2px 6px; border-radius: 
 .cron-label { font-size: 13px; color: var(--text-2); }
 .cron-raw { flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: monospace; }
 .cron-preview { font-size: 12px; color: var(--text-2); background: var(--bg); padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); }
+.btn-remove {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 13px; padding: 2px 6px; border-radius: 4px; line-height: 1;
+}
+.btn-remove:hover { background: #fee2e2; color: #dc2626; }
 </style>

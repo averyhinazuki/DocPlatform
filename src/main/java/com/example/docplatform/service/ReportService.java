@@ -23,10 +23,10 @@ public class ReportService {
     private final ReportJobProducer producer;
     private final GeneratedDocumentRepository documentRepository;
 
-    public String requestReport(Long tenantId, ReportRequest req, String triggeredBy) {
+    public String requestReport(Long tenantId, ReportRequest req, String triggeredBy, Long userId) {
         String lockKey = req.scheduleId() != null
-            ? "report:" + tenantId + ":" + req.scheduleId()
-            : "report:assignment:" + tenantId + ":" + req.assignmentId();
+                ? "report:" + tenantId + ":" + req.scheduleId()
+                : "report:assignment:" + tenantId + ":" + req.assignmentId();
         RLock lock = redissonClient.getLock(lockKey);
         try {
             if (!lock.tryLock(3, 30, TimeUnit.SECONDS)) {
@@ -35,7 +35,7 @@ public class ReportService {
 
             if (req.scheduleId() != null) {
                 boolean alreadyQueued = documentRepository.existsByScheduleIdAndStatusIn(
-                    req.scheduleId(), List.of(ReportStatus.PENDING, ReportStatus.IN_PROGRESS));
+                        req.scheduleId(), List.of(ReportStatus.PENDING, ReportStatus.IN_PROGRESS));
                 if (alreadyQueued) {
                     throw new IllegalStateException("Report already queued");
                 }
@@ -43,6 +43,7 @@ public class ReportService {
 
             GeneratedDocument doc = new GeneratedDocument();
             doc.setTenantId(tenantId);
+            doc.setUserId(userId);
             doc.setScheduleId(req.scheduleId());
             doc.setFileFormat(req.format());
             doc.setStatus(ReportStatus.PENDING);
@@ -50,9 +51,9 @@ public class ReportService {
             documentRepository.save(doc);
 
             producer.publishRequest(new ReportRequestedEvent(
-                doc.getId(), tenantId, req.scheduleId(),
-                req.reportType(), req.format().name(),
-                req.templateId(), req.params(), req.recipients(), triggeredBy, req.note(), req.contentOverride()
+                    doc.getId(), tenantId, req.scheduleId(),
+                    req.reportType(), req.format().name(),
+                    req.templateId(), req.params(), req.recipients(), triggeredBy, req.note(), req.contentOverride()
             ));
 
             return doc.getId();

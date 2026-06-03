@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class GeneratedDocument {
     @Id private String id;
     @Indexed private Long tenantId;
+    @Indexed private Long userId;
     @Indexed private Long scheduleId;
     private FileFormat fileFormat;
     private ReportStatus status;

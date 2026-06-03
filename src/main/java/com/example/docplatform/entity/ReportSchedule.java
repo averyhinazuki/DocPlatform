@@ -18,6 +18,7 @@ import java.util.Map;
 public class ReportSchedule {
     @TableId(type = IdType.AUTO) private Long id;
     private Long tenantId;
+    private Long createdBy;
     private String name;
     private String cronExpr;
     private String reportType;

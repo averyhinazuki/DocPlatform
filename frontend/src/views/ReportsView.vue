@@ -89,13 +89,44 @@
       </form>
 
       <div v-if="documentId" class="result-box">
-        <p class="result-label">Report queued. Document ID:</p>
-        <code class="doc-id">{{ documentId }}</code>
-        <p class="result-hint">
-          You'll receive a notification when it's ready.
-          Copy this ID and use it on the Files page to download.
-        </p>
+        <p class="result-label">Report queued — you'll be notified when it's ready.</p>
       </div>
+    </div>
+
+    <div class="card history-card">
+      <div class="history-header">
+        <h2>Report History</h2>
+        <button class="btn btn-ghost btn-sm" @click="loadHistory" :disabled="historyLoading">
+          {{ historyLoading ? 'Refreshing…' : 'Refresh' }}
+        </button>
+      </div>
+      <div v-if="historyLoading" class="h-hint">Loading…</div>
+      <div v-else-if="history.length === 0" class="h-hint">No reports yet.</div>
+      <table v-else class="history-table">
+        <thead>
+          <tr><th>Format</th><th>Status</th><th>Note</th><th>Generated</th><th></th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="doc in history" :key="doc.id">
+            <td><span class="badge" :class="doc.fileFormat.toLowerCase()">{{ doc.fileFormat }}</span></td>
+            <td><span class="status-chip" :class="doc.status.toLowerCase()">{{ doc.status }}</span></td>
+            <td class="note-cell">{{ doc.note || '—' }}</td>
+            <td class="date-cell">{{ relativeDate(doc.generatedAt) }}</td>
+            <td class="action-cell">
+              <button
+                v-if="doc.status === 'COMPLETED'"
+                class="btn btn-ghost btn-sm"
+                @click="preview(doc.id)"
+              >Preview</button>
+              <button
+                class="btn-remove"
+                title="Delete report"
+                @click="removeDoc(doc.id)"
+              >✕</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </template>
@@ -103,14 +134,19 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { generateReport } from '../api/reports'
+import { listDocuments, deleteDocument } from '../api/files'
 import { listUsers } from '../api/users'
 import { listTemplates, getTemplate } from '../api/templates'
 import { getMyAssignments } from '../api/assignments'
+import { useAuthStore } from '../stores/auth'
 import RteEditor from '../components/RteEditor.vue'
 import { wrapHtml, extractBody } from '../utils/htmlTemplate.js'
 
 const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
 const assignmentId = computed(() => route.query.assignmentId ? Number(route.query.assignmentId) : null)
 const assignmentMode = computed(() => assignmentId.value != null)
 const assignmentNotes = ref('')
@@ -127,6 +163,8 @@ const attachedFile = ref(null)
 const loading = ref(false)
 const error = ref('')
 const documentId = ref('')
+const history = ref([])
+const historyLoading = ref(false)
 const rteContent = ref('')
 const isRteMode = computed(() =>
   selectedTemplate.value !== null &&
@@ -172,7 +210,39 @@ function humanize(key) {
     .replace(/\b\w/g, c => c.toUpperCase())
 }
 
+async function loadHistory() {
+  historyLoading.value = true
+  try {
+    const res = await listDocuments()
+    history.value = res.data
+  } catch { /* non-critical */ }
+  finally { historyLoading.value = false }
+}
+
+function preview(id) {
+  router.push({ path: '/files', query: { docId: id } })
+}
+
+async function removeDoc(id) {
+  if (!confirm('Delete this report? This cannot be undone.')) return
+  try {
+    await deleteDocument(id)
+    history.value = history.value.filter(d => d.id !== id)
+  } catch { /* non-critical */ }
+}
+
+function relativeDate(iso) {
+  if (!iso) return '—'
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return mins + 'm ago'
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return hrs + 'h ago'
+  return Math.floor(hrs / 24) + 'd ago'
+}
+
 onMounted(async () => {
+  loadHistory()
   try {
     const [usersRes, templatesRes] = await Promise.all([listUsers(), listTemplates()])
     tenantUsers.value = usersRes.data
@@ -207,6 +277,7 @@ async function submit() {
     const res = await generateReport(payload, attachedFile.value)
     documentId.value = res.data.documentId
     clearFile()
+    loadHistory()
   } catch (e) {
     error.value = e.response?.data?.message ?? e.message ?? 'Failed to submit report'
   } finally {
@@ -250,4 +321,32 @@ async function submit() {
 .params-grid { display: flex; flex-direction: column; gap: 10px; }
 .param-row { display: grid; grid-template-columns: 140px 1fr; align-items: center; gap: 12px; }
 .param-label { font-size: 13px; color: var(--text-2); font-weight: 500; }
+
+.history-card { margin-top: 24px; }
+.history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.history-header h2 { margin: 0; }
+.h-hint { padding: 12px 0; color: var(--text-2); font-size: 13px; }
+.history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.history-table th { text-align: left; font-weight: 600; padding: 6px 10px; border-bottom: 2px solid var(--border); }
+.history-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.note-cell { color: var(--text-2); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.date-cell { color: var(--text-2); white-space: nowrap; }
+
+.badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.badge.pdf   { background: #fee2e2; color: #b91c1c; }
+.badge.excel { background: #dcfce7; color: #15803d; }
+.badge.csv   { background: #e0f2fe; color: #0369a1; }
+
+.status-chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.status-chip.pending     { background: #fef9c3; color: #854d0e; }
+.status-chip.in_progress { background: #dbeafe; color: #1d4ed8; }
+.status-chip.completed   { background: #dcfce7; color: #15803d; }
+.status-chip.failed      { background: #fee2e2; color: #b91c1c; }
+
+.action-cell { display: flex; align-items: center; gap: 6px; }
+.btn-remove {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-2); font-size: 13px; padding: 2px 6px; border-radius: 4px; line-height: 1;
+}
+.btn-remove:hover { background: #fee2e2; color: #dc2626; }
 </style>

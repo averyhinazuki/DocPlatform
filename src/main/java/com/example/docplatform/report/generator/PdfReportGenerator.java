@@ -11,10 +11,21 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 
 import java.io.ByteArrayOutputStream;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Component
 @RequiredArgsConstructor
 public final class PdfReportGenerator implements ReportGenerator {
+
+    // openhtmltopdf parses HTML as XHTML — void elements must be self-closed
+    private static final Pattern VOID_TAGS = Pattern.compile(
+        "<(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)((?:\\s[^>]*)?)(?<!/)>",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    private static String toXhtml(String html) {
+        return VOID_TAGS.matcher(html).replaceAll("<$1$2/>");
+    }
 
     @Qualifier("reportEngine")
     private final SpringTemplateEngine templateEngine;
@@ -39,7 +50,7 @@ public final class PdfReportGenerator implements ReportGenerator {
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PdfRendererBuilder builder = new PdfRendererBuilder();
-        builder.withHtmlContent(html, null);
+        builder.withHtmlContent(toXhtml(html), null);
         builder.toStream(out);
         builder.run();
         return out.toByteArray();

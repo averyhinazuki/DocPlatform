@@ -2,47 +2,37 @@
   <div class="page">
     <h1>Admin</h1>
 
-    <div class="card" style="margin-bottom: 24px;">
-      <h2>Tenants</h2>
-      <div v-if="tenantsLoading" class="empty-state">Loading…</div>
-      <div v-else-if="tenants.length === 0 && !tenantsError" class="empty-state">No tenants found.</div>
-      <table v-else-if="tenants.length > 0">
+    <div class="card">
+      <h2>Users</h2>
+      <div v-if="usersLoading" class="empty-state">Loading…</div>
+      <div v-else-if="users.length === 0 && !usersError" class="empty-state">No users found.</div>
+      <table v-else-if="users.length > 0">
         <thead>
-          <tr><th>ID</th><th>Name</th><th>Slug</th><th>Plan</th><th>Created</th></tr>
+          <tr><th>ID</th><th>Username</th><th>Role</th><th></th></tr>
         </thead>
         <tbody>
-          <tr v-for="t in tenants" :key="t.id">
-            <td>{{ t.id }}</td>
-            <td>{{ t.name }}</td>
-            <td>{{ t.slug }}</td>
-            <td>{{ t.plan ?? '—' }}</td>
-            <td>{{ formatDate(t.createdAt) }}</td>
+          <tr v-for="u in users" :key="u.id">
+            <td>{{ u.id }}</td>
+            <td>{{ u.username }}</td>
+            <td>
+              <select v-model="pendingRole[u.id]" class="role-select">
+                <option value="ADMIN">ADMIN</option>
+                <option value="USER">USER</option>
+              </select>
+            </td>
+            <td class="action-cell">
+              <button
+                class="btn btn-sm"
+                :disabled="saving[u.id] || pendingRole[u.id] === u.role"
+                @click="saveRole(u)"
+              >{{ saving[u.id] ? 'Saving…' : 'Save' }}</button>
+              <span v-if="rowSuccess[u.id]" class="success-msg">Saved</span>
+              <span v-if="rowError[u.id]" class="error-msg">{{ rowError[u.id] }}</span>
+            </td>
           </tr>
         </tbody>
       </table>
-      <p class="error-msg" v-if="tenantsError">{{ tenantsError }}</p>
-    </div>
-
-    <div class="card" style="max-width: 400px; margin-bottom: 24px;">
-      <h2>Update User Role</h2>
-      <form @submit.prevent="submitRole">
-        <div class="form-group">
-          <label>User ID</label>
-          <input v-model.number="roleForm.userId" type="number" placeholder="2" required />
-        </div>
-        <div class="form-group">
-          <label>Role</label>
-          <select v-model="roleForm.role">
-            <option value="ADMIN">ADMIN</option>
-            <option value="USER">USER</option>
-          </select>
-        </div>
-        <button class="btn" type="submit" :disabled="roleUpdating">
-          {{ roleUpdating ? 'Updating…' : 'Update Role' }}
-        </button>
-        <p class="error-msg" v-if="roleError">{{ roleError }}</p>
-        <p class="success-msg" v-if="roleSuccess">Role updated successfully.</p>
-      </form>
+      <p class="error-msg" v-if="usersError">{{ usersError }}</p>
     </div>
 
   </div>
@@ -50,53 +40,67 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { listTenants, updateRole } from '../api/admin'
+import { updateRole } from '../api/admin'
+import { listUsers } from '../api/users'
 
-const tenants = ref([])
-const tenantsLoading = ref(false)
-const tenantsError = ref('')
+const users = ref([])
+const usersLoading = ref(false)
+const usersError = ref('')
 
-const roleForm = reactive({ userId: null, role: 'USER' })
-const roleUpdating = ref(false)
-const roleError = ref('')
-const roleSuccess = ref(false)
+const pendingRole = reactive({})
+const saving = reactive({})
+const rowSuccess = reactive({})
+const rowError = reactive({})
 
-onMounted(loadTenants)
+onMounted(loadUsers)
 
-async function loadTenants() {
-  tenantsLoading.value = true
-  tenantsError.value = ''
+async function loadUsers() {
+  usersLoading.value = true
+  usersError.value = ''
   try {
-    const res = await listTenants()
-    tenants.value = res.data
+    const res = await listUsers()
+    users.value = res.data
+    res.data.forEach(u => { pendingRole[u.id] = u.role })
   } catch (e) {
-    tenantsError.value = e.response?.status === 403
+    usersError.value = e.response?.status === 403
       ? 'Access denied — Admin role required'
-      : 'Failed to load tenants'
+      : 'Failed to load users'
   } finally {
-    tenantsLoading.value = false
+    usersLoading.value = false
   }
 }
 
-async function submitRole() {
-  roleUpdating.value = true
-  roleError.value = ''
-  roleSuccess.value = false
+async function saveRole(u) {
+  saving[u.id] = true
+  rowError[u.id] = ''
+  rowSuccess[u.id] = false
   try {
-    await updateRole(roleForm.userId, roleForm.role)
-    roleSuccess.value = true
+    await updateRole(u.id, pendingRole[u.id])
+    u.role = pendingRole[u.id]
+    rowSuccess[u.id] = true
+    setTimeout(() => { rowSuccess[u.id] = false }, 2000)
   } catch (e) {
-    roleError.value = e.response?.status === 403
-      ? 'Access denied — Admin role required'
-      : e.response?.data?.message ?? 'Failed to update role'
+    rowError[u.id] = e.response?.data?.message ?? 'Failed to update role'
   } finally {
-    roleUpdating.value = false
+    saving[u.id] = false
   }
-}
-
-function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString()
 }
 </script>
 
+<style scoped>
+.role-select {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  font-size: 0.875rem;
+}
+.action-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 0.8125rem;
+}
+</style>

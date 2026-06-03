@@ -22,16 +22,27 @@ public class FileService {
 
     public List<DocumentSummary> listByTenant(Long tenantId) {
         return documentRepository.findByTenantIdOrderByGeneratedAtDesc(tenantId).stream()
-            .map(d -> new DocumentSummary(d.getId(), d.getFileFormat(), d.getStatus(),
-                                         d.getGeneratedAt(), d.getScheduleId(), d.getNote()))
-            .toList();
+                .map(d -> new DocumentSummary(d.getId(), d.getFileFormat(), d.getStatus(),
+                        d.getGeneratedAt(), d.getScheduleId(), d.getNote()))
+                .toList();
     }
 
-    public void delete(Long tenantId, String documentId) throws Exception {
+    public List<DocumentSummary> listByUser(Long tenantId, Long userId) {
+        return documentRepository.findByTenantIdAndUserIdOrderByGeneratedAtDesc(tenantId, userId).stream()
+                .map(d -> new DocumentSummary(d.getId(), d.getFileFormat(), d.getStatus(),
+                        d.getGeneratedAt(), d.getScheduleId(), d.getNote()))
+                .toList();
+    }
+
+    public void delete(Long tenantId, String documentId, Long callerId, boolean isAdmin) throws Exception {
         GeneratedDocument doc = documentRepository.findById(documentId)
-            .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
 
         if (!doc.getTenantId().equals(tenantId)) {
+            throw new TenantAccessDeniedException("Access denied to document: " + documentId);
+        }
+
+        if (!isAdmin && !callerId.equals(doc.getUserId())) {
             throw new TenantAccessDeniedException("Access denied to document: " + documentId);
         }
 
@@ -43,7 +54,7 @@ public class FileService {
 
     public String getDownloadUrl(Long tenantId, String documentId) throws Exception {
         GeneratedDocument doc = documentRepository.findById(documentId)
-            .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
 
         if (!doc.getTenantId().equals(tenantId)) {
             throw new TenantAccessDeniedException("Access denied to document: " + documentId);

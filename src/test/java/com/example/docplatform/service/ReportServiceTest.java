@@ -47,7 +47,7 @@ class ReportServiceTest {
         });
 
         String id = reportService.requestReport(1L,
-            new ReportRequest(10L, "SALES", FileFormat.PDF, "tmpl-1", Map.of(), List.of("a@b.com"), null, null, null), "alice");
+            new ReportRequest(10L, "SALES", FileFormat.PDF, "tmpl-1", Map.of(), List.of("a@b.com"), null, null, null), "alice", 7L);
 
         assertThat(id).isEqualTo("doc-1");
         verify(producer).publishRequest(any(ReportRequestedEvent.class));
@@ -60,7 +60,7 @@ class ReportServiceTest {
         when(lock.tryLock(anyLong(), anyLong(), any())).thenReturn(false);
 
         assertThatThrownBy(() -> reportService.requestReport(1L,
-            new ReportRequest(10L, "SALES", FileFormat.PDF, "tmpl-1", Map.of(), List.of(), null, null, null), "alice"))
+            new ReportRequest(10L, "SALES", FileFormat.PDF, "tmpl-1", Map.of(), List.of(), null, null, null), "alice", 7L))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("in progress");
     }

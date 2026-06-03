@@ -8,5 +8,6 @@ import java.util.List;
 
 public interface GeneratedDocumentRepository extends MongoRepository<GeneratedDocument, String> {
     List<GeneratedDocument> findByTenantIdOrderByGeneratedAtDesc(Long tenantId);
+    List<GeneratedDocument> findByTenantIdAndUserIdOrderByGeneratedAtDesc(Long tenantId, Long userId);
     boolean existsByScheduleIdAndStatusIn(Long scheduleId, List<ReportStatus> statuses);
 }

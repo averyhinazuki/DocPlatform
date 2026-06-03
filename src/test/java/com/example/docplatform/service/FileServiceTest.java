@@ -74,6 +74,22 @@ class FileServiceTest {
     }
 
     @Test
+    void listByUser_returnsOnlyCallerDocs() {
+        GeneratedDocument doc = new GeneratedDocument();
+        doc.setId("doc-u"); doc.setFileFormat(FileFormat.PDF);
+        doc.setStatus(ReportStatus.COMPLETED);
+        doc.setGeneratedAt(LocalDateTime.of(2026, 5, 31, 9, 0));
+        doc.setUserId(7L);
+
+        when(documentRepository.findByTenantIdAndUserIdOrderByGeneratedAtDesc(1L, 7L)).thenReturn(List.of(doc));
+
+        List<DocumentSummary> result = fileService.listByUser(1L, 7L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).id()).isEqualTo("doc-u");
+    }
+
+    @Test
     void getDownloadUrl_throwsWhenTenantMismatch() {
         GeneratedDocument doc = new GeneratedDocument();
         doc.setId("doc-1"); doc.setTenantId(99L);
@@ -84,47 +100,74 @@ class FileServiceTest {
     }
 
     @Test
-    void delete_removesFromStorageAndRepository() throws Exception {
+    void delete_adminRemovesFromStorageAndRepository() throws Exception {
         GeneratedDocument doc = new GeneratedDocument();
-        doc.setId("doc-1"); doc.setTenantId(1L);
+        doc.setId("doc-1"); doc.setTenantId(1L); doc.setUserId(5L);
         doc.setMinioObjectKey("reports/1/file.pdf");
         when(documentRepository.findById("doc-1")).thenReturn(Optional.of(doc));
 
-        fileService.delete(1L, "doc-1");
+        fileService.delete(1L, "doc-1", 99L, true);
 
         verify(storageService).delete("reports/1/file.pdf");
         verify(documentRepository).deleteById("doc-1");
     }
 
     @Test
-    void delete_skipsMinioWhenNoObjectKey() throws Exception {
+    void delete_ownerCanDeleteOwnDoc() throws Exception {
         GeneratedDocument doc = new GeneratedDocument();
-        doc.setId("doc-2"); doc.setTenantId(1L);
-        doc.setMinioObjectKey(null);
+        doc.setId("doc-2"); doc.setTenantId(1L); doc.setUserId(7L);
+        doc.setMinioObjectKey("reports/1/file.pdf");
         when(documentRepository.findById("doc-2")).thenReturn(Optional.of(doc));
 
-        fileService.delete(1L, "doc-2");
+        fileService.delete(1L, "doc-2", 7L, false);
+
+        verify(storageService).delete("reports/1/file.pdf");
+        verify(documentRepository).deleteById("doc-2");
+    }
+
+    @Test
+    void delete_nonOwnerUserCannotDeleteOtherDoc() throws Exception {
+        GeneratedDocument doc = new GeneratedDocument();
+        doc.setId("doc-3"); doc.setTenantId(1L); doc.setUserId(5L);
+        doc.setMinioObjectKey("reports/1/file.pdf");
+        when(documentRepository.findById("doc-3")).thenReturn(Optional.of(doc));
+
+        assertThatThrownBy(() -> fileService.delete(1L, "doc-3", 7L, false))
+            .isInstanceOf(TenantAccessDeniedException.class);
 
         verify(storageService, never()).delete(Mockito.any());
-        verify(documentRepository).deleteById("doc-2");
+        verify(documentRepository, never()).deleteById(Mockito.any());
+    }
+
+    @Test
+    void delete_skipsMinioWhenNoObjectKey() throws Exception {
+        GeneratedDocument doc = new GeneratedDocument();
+        doc.setId("doc-4"); doc.setTenantId(1L); doc.setUserId(7L);
+        doc.setMinioObjectKey(null);
+        when(documentRepository.findById("doc-4")).thenReturn(Optional.of(doc));
+
+        fileService.delete(1L, "doc-4", 7L, false);
+
+        verify(storageService, never()).delete(Mockito.any());
+        verify(documentRepository).deleteById("doc-4");
     }
 
     @Test
     void delete_throwsResourceNotFoundWhenMissing() {
         when(documentRepository.findById("missing")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> fileService.delete(1L, "missing"))
+        assertThatThrownBy(() -> fileService.delete(1L, "missing", 7L, false))
             .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void delete_throwsTenantAccessDeniedForWrongTenant() throws Exception {
         GeneratedDocument doc = new GeneratedDocument();
-        doc.setId("doc-1"); doc.setTenantId(99L);
+        doc.setId("doc-1"); doc.setTenantId(99L); doc.setUserId(7L);
         doc.setMinioObjectKey("reports/99/file.pdf");
         when(documentRepository.findById("doc-1")).thenReturn(Optional.of(doc));
 
-        assertThatThrownBy(() -> fileService.delete(1L, "doc-1"))
+        assertThatThrownBy(() -> fileService.delete(1L, "doc-1", 7L, true))
             .isInstanceOf(TenantAccessDeniedException.class);
 
         verify(storageService, never()).delete(Mockito.any());

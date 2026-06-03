@@ -19,9 +19,10 @@ public class ScheduleService {
 
     private final ReportScheduleMapper scheduleMapper;
 
-    public ScheduleResponse create(Long tenantId, ScheduleRequest req) {
+    public ScheduleResponse create(Long tenantId, Long createdBy, ScheduleRequest req) {
         ReportSchedule s = new ReportSchedule();
         s.setTenantId(tenantId);
+        s.setCreatedBy(createdBy);
         s.setName(req.name());
         s.setCronExpr(req.cronExpr());
         s.setReportType(req.reportType());
@@ -45,6 +46,14 @@ public class ScheduleService {
         return scheduleMapper.selectList(new LambdaQueryWrapper<ReportSchedule>()
             .eq(ReportSchedule::getStatus, ScheduleStatus.ACTIVE)
             .le(ReportSchedule::getNextRunAt, LocalDateTime.now()));
+    }
+
+    public void delete(Long scheduleId, Long tenantId) {
+        ReportSchedule s = scheduleMapper.selectById(scheduleId);
+        if (s == null || !s.getTenantId().equals(tenantId)) {
+            throw new com.example.docplatform.exception.ResourceNotFoundException("Schedule not found: " + scheduleId);
+        }
+        scheduleMapper.deleteById(scheduleId);
     }
 
     public void recordRun(Long scheduleId, String cronExpr) {

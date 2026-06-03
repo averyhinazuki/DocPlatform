@@ -15,7 +15,10 @@ import java.util.Set;
 @Configuration
 public class MyBatisPlusConfig {
 
-    private static final Set<String> TENANT_EXEMPT = Set.of("tenants", "users");
+    // report_schedules is exempt because the scheduler runs outside any HTTP request
+    // (TenantContextHolder is null), so the plugin would rewrite to tenant_id=0.
+    // All per-tenant queries in ScheduleService already apply tenantId manually.
+    private static final Set<String> TENANT_EXEMPT = Set.of("tenants", "users", "report_schedules");
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
