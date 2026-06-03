@@ -3,6 +3,7 @@ package com.example.docplatform.notification;
 import com.example.docplatform.entity.User;
 import com.example.docplatform.mapper.UserMapper;
 import com.example.docplatform.repository.NotificationRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -26,18 +27,22 @@ class InAppNotificationServiceTest {
     @Mock RTopic rTopic;
     @Mock NotificationRepository notificationRepository;
     @Mock UserMapper userMapper;
+    @Mock ObjectMapper objectMapper;
     @InjectMocks InAppNotificationService service;
 
     @Test
-    void send_persistsAndPublishes() {
+    void send_persistsNotificationAndUsesUserScopedTopic() throws Exception {
         User u = new User(); u.setId(5L); u.setTenantId(1L); u.setUsername("a@b.com");
         when(userMapper.selectOne(any())).thenReturn(u);
         when(redissonClient.getTopic(anyString())).thenReturn(rTopic);
+        when(objectMapper.writeValueAsString(any())).thenReturn(
+            "{\"id\":null,\"message\":\"Report ready\",\"note\":null,\"documentId\":null}");
 
         service.send(1L, List.of("a@b.com"), "Report ready", null, null);
 
         verify(notificationRepository).save(argThat(n ->
             n.getTenantId().equals(1L) && n.getUserId().equals(5L) && !n.isRead()));
-        verify(rTopic).publish("Report ready");
+        verify(redissonClient).getTopic("notifications:1:5");
+        verify(rTopic).publish(argThat(s -> s.toString().contains("\"message\"")));
     }
 }

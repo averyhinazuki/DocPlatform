@@ -5,6 +5,7 @@ import com.example.docplatform.entity.User;
 import com.example.docplatform.mapper.UserMapper;
 import com.example.docplatform.notification.InAppNotificationService;
 import com.example.docplatform.repository.NotificationRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -27,12 +28,14 @@ class InAppNotificationServiceTest {
     @Mock NotificationRepository notificationRepository;
     @Mock UserMapper userMapper;
     @Mock RedissonClient redissonClient;
+    @Mock ObjectMapper objectMapper;
     @InjectMocks InAppNotificationService inAppNotificationService;
 
-    private void stubRedisson() {
+    private void stubRedisson() throws Exception {
         RTopic mockTopic = mock(RTopic.class);
         when(redissonClient.getTopic(anyString())).thenReturn(mockTopic);
         when(mockTopic.publish(any())).thenReturn(0L);
+        when(objectMapper.writeValueAsString(any())).thenReturn("{\"message\":\"ok\"}");
     }
 
     private User stubUser() {
@@ -43,7 +46,7 @@ class InAppNotificationServiceTest {
     }
 
     @Test
-    void send_storesDocumentIdOnNotification() {
+    void send_storesDocumentIdOnNotification() throws Exception {
         stubRedisson();
         stubUser();
 
@@ -55,7 +58,7 @@ class InAppNotificationServiceTest {
     }
 
     @Test
-    void send_allowsNullDocumentId() {
+    void send_allowsNullDocumentId() throws Exception {
         stubRedisson();
         stubUser();
 
