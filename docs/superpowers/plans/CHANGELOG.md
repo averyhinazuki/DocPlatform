@@ -1,5 +1,25 @@
 # DocPlatform Changelog
 
+## 2026-06-11 — Infra Parity: Flyway, Dockerfile, GHCR publish
+
+**Feature:** MySQL schema is now managed by Flyway. `V1__init.sql` replaces the hand-applied `schema.sql` and fixes its drift (`tenants.concurrent_job_limit` was missing). `baseline-on-migrate: true` protects the existing local DB; fresh databases are migrated automatically; future changes are `V2__*.sql` files. A new `MapperIntegrationTest` boots a Testcontainers MySQL, runs Flyway, and verifies real-mapper CRUD plus tenant-plugin isolation on `report_assignments` (including the tenant_id=0 fallback). A multi-stage Dockerfile (Maven build stage → JRE runtime) was added, and CI gained a `publish` job that pushes `ghcr.io/averyhinazuki/docplatform:{latest,sha}` after both test jobs pass on main. Also: root `.gitignore` added; pom aligned to Java 21.
+
+**Files created:**
+- `src/main/resources/db/migration/V1__init.sql` — full current schema (5 tables, drift fixed)
+- `src/test/java/com/example/docplatform/mapper/MapperIntegrationTest.java` — 3 Testcontainers tests
+- `Dockerfile` — multi-stage build
+- `.gitignore` — root ignore file
+
+**Files modified:**
+- `pom.xml` — Java 21; flyway-core, flyway-mysql, mybatis-plus-spring-boot3-starter-test deps
+- `src/main/resources/application.yml` — removed `sql.init`, added `spring.flyway.baseline-on-migrate`
+- `.github/workflows/ci.yml` — added `publish` job (GHCR)
+
+**Files removed:**
+- `src/main/resources/schema.sql` — replaced by Flyway V1
+
+---
+
 ## 2026-06-04 — GitHub Actions CI Pipeline
 
 **Feature:** Added a CI pipeline via GitHub Actions. Two jobs run in parallel on every push and PR to `main`: `backend` (runs `mvn test` on Java 21/Temurin with Maven dependency caching) and `frontend` (runs `npm ci && npm run build` on Node 20 with npm cache). A README with a live CI badge was added to the repo root. `UserMapperTest` was removed as it required a real MySQL connection and was a manual dev test, not a unit test.
