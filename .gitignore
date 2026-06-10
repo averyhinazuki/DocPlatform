@@ -1,0 +1,17 @@
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Claude/agent scratch
+.superpowers/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
