@@ -43,5 +43,11 @@ JMeter run with two tenants — one flooding report requests, proving clean 429s
 
 **Implemented:** `perf/` (JMeter plan, seed/analyze/replay scripts, RESULTS.md). Numbers: 200-burst → 3 admitted / 197×429 p50 61ms, admitted concurrency capped at 3; quiet tenant e2e p50 22ms during flood; zero loss; duplicate-event replay = verified no-op. Found & fixed 2 real bugs: 429→500 advice precedence, poison-pill partition wedge (ErrorHandlingDeserializer). 74 tests green.
 
-## 10. Resume: fill the [Second Project] slot
+## 10. Resume: fill the [Second Project] slot ✅ DONE (2026-06-13)
 Draft 4–5 DocPlatform bullets in ShopHub's style for `~/Desktop/resume.html`, leading with what ShopHub doesn't have: multi-tenancy + per-tenant quotas, exactly-once delivery (a step past ShopHub's at-least-once + idempotency), real-time SSE push, full-stack breadth (Vue 3, MongoDB, MinIO, Testcontainers). Use the numbers from #9.
+
+**Done:** 5 bullets added to `~/Desktop/resume.html` (outside this repo): quota under burst (3 admitted / 197×429 p50 61ms, quiet tenant p50 22ms e2e), exactly-once two-phase write + replay no-op, retry/DLT + poison-pill hardening, bugs-found-by-testing story, SSE + delivery practices. Skills rows updated (MinIO, Testcontainers, multi-tenancy, exactly-once).
+
+---
+
+Backlog complete. Candidate future items: README screenshots (needs running app), notification on DLT-failed reports, `@RetryableTopic` exclude-based exception classification, quiet-tenant fairness metrics in CI.
