@@ -35,6 +35,17 @@ A report request flows: REST controller acquires the tenant's quota slot (Redis 
 - **Scheduling** — cron-based schedules (6-field Spring cron, with a friendly builder UI) create report assignments for recipients
 - **Session auth** — Spring Security + Spring Session (Redis), role-based access (ADMIN / USER), first registrant in a tenant becomes its admin
 
+## Performance evidence
+
+Load-tested with JMeter ([plan, scripts & full results](perf/)): a **200-request burst** from one
+tenant is capped at its concurrency limit — 3 admitted, **197 clean HTTP 429s** (p50 61 ms),
+admitted concurrency never exceeding the limit — while a second tenant's reports complete at
+**p50 22 ms end-to-end during the flood**. All accepted jobs complete (zero loss), quota counters
+drain to zero, and replaying a duplicate Kafka event is a verified no-op (no duplicate report,
+no quota drift). The test campaign also caught two real bugs — an exception-handler precedence
+issue turning 429s into 500s, and a poison-pill message wedging a consumer partition — both
+fixed with regression coverage. See [perf/RESULTS.md](perf/RESULTS.md).
+
 ## Stack
 
 | Layer | Technology |

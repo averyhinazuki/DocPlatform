@@ -38,8 +38,10 @@ Document/report list endpoints return everything. Add pagination (MyBatis-Plus `
 
 **Implemented:** Spring Data `Pageable` (documents are in MongoDB, not MySQL — the MyBatis-Plus assumption was wrong). `GET /api/files?page=&size=` returns a `PageResponse` envelope; FilesView and ReportsView history get Prev/Next pagers. 72 tests green.
 
-## 9. Performance evidence: quota load test + exactly-once crash demo
+## 9. Performance evidence: quota load test + exactly-once crash demo ✅ DONE (2026-06-13)
 JMeter run with two tenants — one flooding report requests, proving clean 429s for the busy tenant and no starvation for the other. Separately, a crash-recovery demo: kill the consumer between MinIO write and Mongo update, restart, show exactly one report and no orphan. Produces the measurable numbers the resume bullets need.
+
+**Implemented:** `perf/` (JMeter plan, seed/analyze/replay scripts, RESULTS.md). Numbers: 200-burst → 3 admitted / 197×429 p50 61ms, admitted concurrency capped at 3; quiet tenant e2e p50 22ms during flood; zero loss; duplicate-event replay = verified no-op. Found & fixed 2 real bugs: 429→500 advice precedence, poison-pill partition wedge (ErrorHandlingDeserializer). 74 tests green.
 
 ## 10. Resume: fill the [Second Project] slot
 Draft 4–5 DocPlatform bullets in ShopHub's style for `~/Desktop/resume.html`, leading with what ShopHub doesn't have: multi-tenancy + per-tenant quotas, exactly-once delivery (a step past ShopHub's at-least-once + idempotency), real-time SSE push, full-stack breadth (Vue 3, MongoDB, MinIO, Testcontainers). Use the numbers from #9.

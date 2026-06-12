@@ -1,5 +1,26 @@
 # DocPlatform Changelog
 
+## 2026-06-13 — Performance evidence: quota load test + exactly-once replay (+2 bugs found & fixed)
+
+**Feature:** Reproducible performance/correctness evidence in `perf/`: `seed.sh` (two tenants + templates), `quota-load-test.jmx` (JMeter: 200-request burst from a noisy tenant + 20 paced requests from a quiet tenant, PDF jobs), `analyze.py` (status/latency/concurrency summary), `replay-idempotency.sh` (duplicate Kafka event replay), `RESULTS.md` (full numbers). Headline results: noisy burst → 3 admitted (= limit), 197 clean HTTP 429s (p50 61 ms), admitted concurrency never exceeded 3; quiet tenant completed reports at p50 22 ms end-to-end *during* the flood; 22 accepted = 22 COMPLETED (zero loss); counters drain to 0; duplicate-event replay verified as a no-op. README gained a Performance evidence section.
+
+**Bug 1 (found by load test):** quota rejections returned HTTP **500**, not 429 — `GlobalExceptionHandler`'s catch-all `@ExceptionHandler(Exception.class)` outranks `@ResponseStatus` on `TenantQuotaExceededException`, and unit tests missed it because standalone MockMvc doesn't register the advice. Fixed with an explicit 429 handler; the catch-all now also logs the swallowed exception.
+
+**Bug 2 (found by replay testing):** a malformed message on `report.requested` permanently wedged its partition — bare `JsonDeserializer` throws inside `poll()`, which `DefaultErrorHandler` cannot handle (observed live: infinite redelivery loop). Fixed by wrapping with `ErrorHandlingDeserializer` (delegate: `JsonDeserializer`), which routes poison pills through the DLT path and lets the consumer move on.
+
+**Files created:**
+- `perf/seed.sh`, `perf/quota-load-test.jmx`, `perf/analyze.py`, `perf/replay-idempotency.sh`, `perf/RESULTS.md`
+
+**Files modified:**
+- `src/main/java/com/example/docplatform/exception/GlobalExceptionHandler.java` — explicit 429 handler for `TenantQuotaExceededException`; generic handler logs
+- `src/main/resources/application.yml` — `ErrorHandlingDeserializer` wrapping `JsonDeserializer`
+- `README.md` — Performance evidence section
+
+**Tests created:**
+- `src/test/java/com/example/docplatform/exception/GlobalExceptionHandlerTest.java` — 429 mapping regression + generic-500 no-detail-leak. 74 tests green.
+
+---
+
 ## 2026-06-13 — Pagination on document lists
 
 **Feature:** `GET /api/files` is paginated. Documents live in MongoDB, so this uses Spring Data `Pageable` (not MyBatis-Plus as the backlog originally guessed). The endpoint takes `page` (default 0) and `size` (default 20, clamped 1–100) and returns a generic `PageResponse<T>` envelope: `{items, page, size, totalElements, totalPages}`. Both repository finders gained `Pageable` parameters; sort stays newest-first via the method name. Frontend: FilesView's document list and ReportsView's Report History card each get a Prev/Next pager (20/page and 10/page respectively); delete now reloads the current page from the server so it backfills, stepping back a page if the last item on a page was deleted; submitting a report still refreshes history to page 0 where the new report appears. Known minor limitation: the `/files?docId=` deep-link auto-selects only if the doc is on page 0 (newest-first makes this the overwhelmingly common case for notification clicks).
