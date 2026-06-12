@@ -23,8 +23,10 @@ Boot backend + frontend against the freshly imported local MySQL (`docplatform` 
 
 **Done:** App boots end-to-end (login → generate report → SSE notification → file preview). Full test suite green (64 tests). Two environment fixes were needed: `JAVA_HOME` pinned to JDK 21 (Homebrew Maven defaults to its bundled JDK 26, breaking Lombok) and Testcontainers upgraded 1.21.3 → 2.0.5 (Docker Engine 29 rejects the 1.x client's API version — see changelog).
 
-## 6. Secret externalization
+## 6. Secret externalization ✅ DONE (2026-06-13)
 Move `password: 123456` and `minioadmin` credentials out of `application.yml` into environment variables with sane defaults for local dev. Quick, and a public repo with hardcoded credentials looks unprofessional to reviewers.
+
+**Implemented:** `${DB_USERNAME:root}`, `${DB_PASSWORD:123456}`, `${MINIO_ENDPOINT:http://localhost:9000}`, `${MINIO_ACCESS_KEY:minioadmin}`, `${MINIO_SECRET_KEY:minioadmin}` in `application.yml`; env var table added to README. Boot-verified with defaults.
 
 ## 7. Kafka retry + DLT on ReportJobConsumer
 A failed report job currently has no recovery path. Add retry with backoff on a dedicated retry topic and a dead-letter topic for exhausted messages, mirroring the ShopHub design. Real functional gap and a strong interview talking point ("what happens when a report job fails?").

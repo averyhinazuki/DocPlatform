@@ -65,7 +65,17 @@ docker compose up -d        # Kafka + Zookeeper, Redis, MongoDB, MinIO
 CREATE DATABASE docplatform;
 ```
 
-Flyway creates the schema automatically on first boot (`src/main/resources/db/migration`). Database credentials are configured in `src/main/resources/application.yml`.
+Flyway creates the schema automatically on first boot (`src/main/resources/db/migration`).
+
+Credentials are read from environment variables, with defaults matching the local Docker Compose setup:
+
+| Variable | Default |
+|---|---|
+| `DB_USERNAME` / `DB_PASSWORD` | `root` / `123456` |
+| `MINIO_ENDPOINT` | `http://localhost:9000` |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | `minioadmin` / `minioadmin` |
+
+Set them explicitly for any non-local deployment.
 
 ### 3. Backend
 

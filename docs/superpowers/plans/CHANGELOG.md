@@ -1,5 +1,15 @@
 # DocPlatform Changelog
 
+## 2026-06-13 — Secret externalization
+
+**Feature:** Credentials no longer hardcoded in `application.yml`. MySQL username/password and MinIO endpoint/access-key/secret-key now use Spring `${ENV_VAR:default}` placeholders — `DB_USERNAME`, `DB_PASSWORD`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` — with defaults matching the local Docker Compose setup, so local dev needs no extra configuration while real deployments set env vars. README documents the variables. Verified: app boots with defaults (Tomcat up, `/api/auth/me` → 401 as expected).
+
+**Files modified:**
+- `src/main/resources/application.yml` — placeholder syntax for datasource username/password and minio endpoint/access-key/secret-key
+- `README.md` — env var table in Getting Started
+
+---
+
 ## 2026-06-13 — Testcontainers 2.x upgrade (Docker Engine 29 compatibility)
 
 **Fix:** `MapperIntegrationTest` failed on the new Mac with "Could not find a valid Docker environment" — Docker Desktop 4.52+ ships Engine 29, which raised the daemon's minimum API version (1.40); all of Testcontainers 1.x speaks API 1.32 and gets HTTP 400 on every request (verified by probing `/v1.32/info` vs `/v1.40/info` on the daemon socket). No 1.x patch exists; the fix landed in Testcontainers 2.0.2+ (testcontainers-java#11212/#11235). Upgraded to 2.0.5: artifact IDs gain a `testcontainers-` prefix, `MySQLContainer` moved to `org.testcontainers.mysql` and is no longer generic. Full suite green: 64 tests, 0 failures.
