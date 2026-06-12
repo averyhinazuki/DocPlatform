@@ -1,5 +1,15 @@
 # DocPlatform Changelog
 
+## 2026-06-12 — README rewrite + backlog refresh
+
+**Fix/Feature:** The committed README had every markdown character backslash-escaped (`\#`, `\*\*`) and rendered as literal garbage on GitHub. Rewritten from scratch with clean markdown: one-paragraph pitch, Mermaid architecture diagram of the report pipeline (REST → quota → Kafka → consumer → MinIO/Mongo two-phase write → notification fan-out → SSE), feature list with technical hooks, stack table, full local setup instructions (docker compose, MySQL + Flyway, backend, frontend), testing and CI/CD sections. Screenshots deferred until after the new-machine smoke test (todolist #5). Also: `docs/todolist.md` gained items 4–10 — the merged backlog from the resume assessment (README, env smoke test, secret externalization, Kafka retry+DLT, pagination, performance evidence, resume bullets).
+
+**Files modified:**
+- `README.md` — full rewrite
+- `docs/todolist.md` — backlog items 4–10 added
+
+---
+
 ## 2026-06-11 — Infra Parity: Flyway, Dockerfile, GHCR publish
 
 **Feature:** MySQL schema is now managed by Flyway. `V1__init.sql` replaces the hand-applied `schema.sql` and fixes its drift (`tenants.concurrent_job_limit` was missing). `baseline-on-migrate: true` protects the existing local DB; fresh databases are migrated automatically; future changes are `V2__*.sql` files. A new `MapperIntegrationTest` boots a Testcontainers MySQL, runs Flyway, and verifies real-mapper CRUD plus tenant-plugin isolation on `report_assignments` (including the tenant_id=0 fallback). A multi-stage Dockerfile (Maven build stage → JRE runtime) was added, and CI gained a `publish` job that pushes `ghcr.io/averyhinazuki/docplatform:{latest,sha}` after both test jobs pass on main. Also: root `.gitignore` added; pom aligned to Java 21.

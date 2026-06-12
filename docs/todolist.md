@@ -14,3 +14,24 @@ Closes the gap where a consumer crash after MinIO write but before MongoDB updat
 Replace the 15-second NotificationBell polling with a WebSocket push using Spring's `SimpMessagingTemplate` or a Redisson `RTopic` subscriber. Smaller impact than #1 and #2 but removes a known design weakness and is easy to demo.
 
 **Implemented:** Fixed RTopic topic key from tenant-scoped to user-scoped (`notifications:{tenantId}:{userId}`). `InAppNotificationService` now publishes a JSON payload (id, message, note, documentId) via Jackson. New `SseController` subscribes an RTopic listener per connected user and streams events via Spring `SseEmitter` (5-min timeout, cleanup on completion/timeout/error). Frontend `NotificationBell.vue` opens a native `EventSource` on mount and drops the `setInterval` poll; `notifications.js` store gains `connect()` / `disconnect()` — on SSE error, a single `fetch()` resyncs state. 3 new tests in `SseControllerTest`, updated `InAppNotificationServiceTest` (both packages).
+
+## 4. README rewrite
+The committed README has every markdown character backslash-escaped (`\#`, `\*\*`) so GitHub renders it as literal garbage — the first thing a reviewer sees. It's also only ~35 lines. Rewrite with: clean markdown, architecture overview/diagram, feature list, local setup instructions (Docker Compose, Flyway, env vars), and screenshots. Highest impact-to-effort item; no running environment needed.
+
+## 5. Smoke-test the new Mac environment
+Boot backend + frontend against the freshly imported local MySQL (`docplatform` DB, Flyway `baseline-on-migrate` should handle the existing schema) plus the Docker-hosted infra (Kafka, Redis, MongoDB, MinIO). Confirms the Windows→Mac migration is complete; prerequisite for all dev work below.
+
+## 6. Secret externalization
+Move `password: 123456` and `minioadmin` credentials out of `application.yml` into environment variables with sane defaults for local dev. Quick, and a public repo with hardcoded credentials looks unprofessional to reviewers.
+
+## 7. Kafka retry + DLT on ReportJobConsumer
+A failed report job currently has no recovery path. Add retry with backoff on a dedicated retry topic and a dead-letter topic for exhausted messages, mirroring the ShopHub design. Real functional gap and a strong interview talking point ("what happens when a report job fails?").
+
+## 8. Pagination on document lists
+Document/report list endpoints return everything. Add pagination (MyBatis-Plus `Page`) and wire the frontend lists to it. Small but expected in any real app.
+
+## 9. Performance evidence: quota load test + exactly-once crash demo
+JMeter run with two tenants — one flooding report requests, proving clean 429s for the busy tenant and no starvation for the other. Separately, a crash-recovery demo: kill the consumer between MinIO write and Mongo update, restart, show exactly one report and no orphan. Produces the measurable numbers the resume bullets need.
+
+## 10. Resume: fill the [Second Project] slot
+Draft 4–5 DocPlatform bullets in ShopHub's style for `~/Desktop/resume.html`, leading with what ShopHub doesn't have: multi-tenancy + per-tenant quotas, exactly-once delivery (a step past ShopHub's at-least-once + idempotency), real-time SSE push, full-stack breadth (Vue 3, MongoDB, MinIO, Testcontainers). Use the numbers from #9.
