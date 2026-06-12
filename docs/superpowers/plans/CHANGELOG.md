@@ -1,5 +1,17 @@
 # DocPlatform Changelog
 
+## 2026-06-13 — Testcontainers 2.x upgrade (Docker Engine 29 compatibility)
+
+**Fix:** `MapperIntegrationTest` failed on the new Mac with "Could not find a valid Docker environment" — Docker Desktop 4.52+ ships Engine 29, which raised the daemon's minimum API version (1.40); all of Testcontainers 1.x speaks API 1.32 and gets HTTP 400 on every request (verified by probing `/v1.32/info` vs `/v1.40/info` on the daemon socket). No 1.x patch exists; the fix landed in Testcontainers 2.0.2+ (testcontainers-java#11212/#11235). Upgraded to 2.0.5: artifact IDs gain a `testcontainers-` prefix, `MySQLContainer` moved to `org.testcontainers.mysql` and is no longer generic. Full suite green: 64 tests, 0 failures.
+
+**Local-machine note (not in repo):** Homebrew's `mvn` defaults to Homebrew's bundled JDK (26) when `JAVA_HOME` is unset, which breaks Lombok (`TypeTag :: UNKNOWN` compile error). Fix: `export JAVA_HOME="/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home"` in `~/.zshrc`.
+
+**Files modified:**
+- `pom.xml` — `testcontainers.version` 1.21.3 → 2.0.5 (with comment); artifact renames: `junit-jupiter`→`testcontainers-junit-jupiter`, `mysql`→`testcontainers-mysql`, `mongodb`→`testcontainers-mongodb`, `kafka`→`testcontainers-kafka`
+- `src/test/java/com/example/docplatform/mapper/MapperIntegrationTest.java` — import `org.testcontainers.mysql.MySQLContainer`; raw (non-generic) `MySQLContainer`
+
+---
+
 ## 2026-06-12 — README rewrite + backlog refresh
 
 **Fix/Feature:** The committed README had every markdown character backslash-escaped (`\#`, `\*\*`) and rendered as literal garbage on GitHub. Rewritten from scratch with clean markdown: one-paragraph pitch, Mermaid architecture diagram of the report pipeline (REST → quota → Kafka → consumer → MinIO/Mongo two-phase write → notification fan-out → SSE), feature list with technical hooks, stack table, full local setup instructions (docker compose, MySQL + Flyway, backend, frontend), testing and CI/CD sections. Screenshots deferred until after the new-machine smoke test (todolist #5). Also: `docs/todolist.md` gained items 4–10 — the merged backlog from the resume assessment (README, env smoke test, secret externalization, Kafka retry+DLT, pagination, performance evidence, resume bullets).

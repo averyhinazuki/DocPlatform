@@ -18,8 +18,10 @@ Replace the 15-second NotificationBell polling with a WebSocket push using Sprin
 ## 4. README rewrite
 The committed README has every markdown character backslash-escaped (`\#`, `\*\*`) so GitHub renders it as literal garbage — the first thing a reviewer sees. It's also only ~35 lines. Rewrite with: clean markdown, architecture overview/diagram, feature list, local setup instructions (Docker Compose, Flyway, env vars), and screenshots. Highest impact-to-effort item; no running environment needed.
 
-## 5. Smoke-test the new Mac environment
+## 5. Smoke-test the new Mac environment ✅ DONE (2026-06-13)
 Boot backend + frontend against the freshly imported local MySQL (`docplatform` DB, Flyway `baseline-on-migrate` should handle the existing schema) plus the Docker-hosted infra (Kafka, Redis, MongoDB, MinIO). Confirms the Windows→Mac migration is complete; prerequisite for all dev work below.
+
+**Done:** App boots end-to-end (login → generate report → SSE notification → file preview). Full test suite green (64 tests). Two environment fixes were needed: `JAVA_HOME` pinned to JDK 21 (Homebrew Maven defaults to its bundled JDK 26, breaking Lombok) and Testcontainers upgraded 1.21.3 → 2.0.5 (Docker Engine 29 rejects the 1.x client's API version — see changelog).
 
 ## 6. Secret externalization
 Move `password: 123456` and `minioadmin` credentials out of `application.yml` into environment variables with sane defaults for local dev. Quick, and a public repo with hardcoded credentials looks unprofessional to reviewers.
