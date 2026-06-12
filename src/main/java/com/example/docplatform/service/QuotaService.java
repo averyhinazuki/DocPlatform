@@ -27,6 +27,14 @@ public class QuotaService {
     }
 
     public void release(Long tenantId) {
-        redissonClient.getAtomicLong("tenant:" + tenantId + ":running").decrementAndGet();
+        // Floored at 0: release is called once per terminal job outcome, but Kafka's
+        // at-least-once delivery can replay a terminal message (e.g. the DLT handler) —
+        // a duplicate release must not free a slot another job is holding via underflow.
+        RAtomicLong counter = redissonClient.getAtomicLong("tenant:" + tenantId + ":running");
+        long v;
+        do {
+            v = counter.get();
+            if (v <= 0) return;
+        } while (!counter.compareAndSet(v, v - 1));
     }
 }

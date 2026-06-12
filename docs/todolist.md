@@ -28,8 +28,10 @@ Move `password: 123456` and `minioadmin` credentials out of `application.yml` in
 
 **Implemented:** `${DB_USERNAME:root}`, `${DB_PASSWORD:123456}`, `${MINIO_ENDPOINT:http://localhost:9000}`, `${MINIO_ACCESS_KEY:minioadmin}`, `${MINIO_SECRET_KEY:minioadmin}` in `application.yml`; env var table added to README. Boot-verified with defaults.
 
-## 7. Kafka retry + DLT on ReportJobConsumer
+## 7. Kafka retry + DLT on ReportJobConsumer ✅ DONE (2026-06-13)
 A failed report job currently has no recovery path. Add retry with backoff on a dedicated retry topic and a dead-letter topic for exhausted messages, mirroring the ShopHub design. Real functional gap and a strong interview talking point ("what happens when a report job fails?").
+
+**Implemented:** `@RetryableTopic` (4 attempts, 10s/30s/90s backoff) + `@DltHandler`; non-retryable (ISE/IAE) marked FAILED immediately, transient rethrown to retry topics. Review fix: quota released exactly once per job on terminal outcomes only (rethrow keeps the slot held), DLT handler never overwrites COMPLETED. 71 tests green.
 
 ## 8. Pagination on document lists
 Document/report list endpoints return everything. Add pagination (MyBatis-Plus `Page`) and wire the frontend lists to it. Small but expected in any real app.

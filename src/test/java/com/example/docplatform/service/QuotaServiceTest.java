@@ -73,10 +73,21 @@ class QuotaServiceTest {
     }
 
     @Test
-    void release_decrementsCounter() {
+    void release_decrementsCounterViaCas() {
+        when(counter.get()).thenReturn(2L);
+        when(counter.compareAndSet(2L, 1L)).thenReturn(true);
+
         quotaService.release(1L);
 
-        verify(redissonClient).getAtomicLong("tenant:1:running");
-        verify(counter).decrementAndGet();
+        verify(counter).compareAndSet(2L, 1L);
+    }
+
+    @Test
+    void release_noOpWhenCounterAlreadyZero() {
+        when(counter.get()).thenReturn(0L);
+
+        quotaService.release(1L);
+
+        verify(counter, never()).compareAndSet(anyLong(), anyLong());
     }
 }

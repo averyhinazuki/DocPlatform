@@ -17,4 +17,8 @@ public class KafkaTopicConfig {
     public NewTopic reportCompleted() {
         return TopicBuilder.name("report.completed").partitions(3).replicas(1).build();
     }
+
+    // report.requested's retry topics and DLT are auto-created by @RetryableTopic
+    // (autoCreateTopics) on ReportJobConsumer — defining the DLT here too would race
+    // the framework's creation with mismatched partition counts.
 }

@@ -1,5 +1,20 @@
 # DocPlatform Changelog
 
+## 2026-06-13 — Kafka retry + dead-letter topic on ReportJobConsumer
+
+**Feature:** Failed report jobs now recover from transient failures instead of silently disappearing. `ReportJobConsumer` gains `@RetryableTopic(attempts = "4", backoff = @Backoff(delay = 10_000, multiplier = 3.0))`, producing a retry schedule of 10 s → 30 s → 90 s before the message lands in the DLT. Exception classification inside the consumer separates retryable from fatal: `IllegalStateException` (document/template not found) and `IllegalArgumentException` (no generator for format) are caught, the document is marked FAILED immediately, and the method returns normally (offset committed, no retry). All other exceptions — MinIO hiccup, MongoDB timeout, rendering crash — are re-thrown so `@RetryableTopic` routes them through the retry topics. A `@DltHandler` marks the document FAILED ("Report job failed after max retries") once retries are exhausted — unless the doc is already COMPLETED (final attempt may have succeeded and only failed publishing the completion event).
+
+**Quota lifecycle (review fix):** quota is released exactly once per job, on terminal outcomes only — success, non-retryable failure (`markFailedAndRelease` helper), or DLT exhaustion. A rethrow-for-retry keeps the slot held, so retrying jobs still count against the tenant's concurrency limit (the original draft released in `finally` on every attempt, which let a tenant exceed its limit during retry backoff). `QuotaService.release()` keeps a CAS floor-at-zero loop as defense against replayed terminal messages (Kafka at-least-once on the DLT).
+
+**Files modified:**
+- `src/main/java/com/example/docplatform/kafka/consumer/ReportJobConsumer.java` — `@RetryableTopic` + `@Slf4j`; split catch blocks (non-retryable vs transient); terminal-outcome-only quota release; `markFailedAndRelease()` helper; `@DltHandler handleDlt()` with COMPLETED guard + quota release; missing-doc case logs, releases, returns without save
+- `src/main/java/com/example/docplatform/config/KafkaTopicConfig.java` — comment only: retry/DLT topics are auto-created by `@RetryableTopic` (no manual DLT bean, avoids partition-count race)
+- `src/main/java/com/example/docplatform/service/QuotaService.java` — `release()` uses a CAS loop floored at 0 (absorbs duplicate terminal releases), with comment
+- `src/test/java/com/example/docplatform/kafka/consumer/ReportJobConsumerTest.java` — kept 3 exactly-once tests; added 6: `nonRetryable_missingDocument_releasesQuotaAndReturns`, `nonRetryable_unsupportedFormat_marksFailedWithoutRethrowing`, `transientFailure_rethrowsForRetry` (asserts quota NOT released on rethrow), `handleDlt_marksDocumentFailed`, `handleDlt_doesNotOverwriteCompletedDocument`, `handleDlt_silentWhenDocumentNotFound`
+- `src/test/java/com/example/docplatform/service/QuotaServiceTest.java` — replaced `release_decrementsCounter` with `release_decrementsCounterViaCas` and `release_noOpWhenCounterAlreadyZero`
+
+---
+
 ## 2026-06-13 — Secret externalization
 
 **Feature:** Credentials no longer hardcoded in `application.yml`. MySQL username/password and MinIO endpoint/access-key/secret-key now use Spring `${ENV_VAR:default}` placeholders — `DB_USERNAME`, `DB_PASSWORD`, `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` — with defaults matching the local Docker Compose setup, so local dev needs no extra configuration while real deployments set env vars. README documents the variables. Verified: app boots with defaults (Tomcat up, `/api/auth/me` → 401 as expected).
