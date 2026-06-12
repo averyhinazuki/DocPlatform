@@ -26,6 +26,11 @@
             @click.stop="remove(doc.id)"
           >✕</button>
         </div>
+        <div v-if="totalPages > 1" class="pager">
+          <button class="pager-btn" :disabled="page === 0" @click="loadPage(page - 1)">‹ Prev</button>
+          <span class="pager-info">{{ page + 1 }} / {{ totalPages }}</span>
+          <button class="pager-btn" :disabled="page >= totalPages - 1" @click="loadPage(page + 1)">Next ›</button>
+        </div>
       </div>
 
       <!-- Right panel: preview -->
@@ -77,14 +82,23 @@ const selectedId = ref(null)
 const presignedUrl = ref('')
 const loadingPreview = ref(false)
 const previewError = ref('')
+const page = ref(0)
+const totalPages = ref(0)
 
-onMounted(async () => {
+async function loadPage(p) {
+  loadingList.value = true
   try {
-    const res = await listDocuments()
-    documents.value = res.data
+    const res = await listDocuments(p, 20)
+    documents.value = res.data.items
+    page.value = res.data.page
+    totalPages.value = res.data.totalPages
   } finally {
     loadingList.value = false
   }
+}
+
+onMounted(async () => {
+  await loadPage(0)
 
   const docId = route.query.docId
   if (docId) {
@@ -113,11 +127,15 @@ async function remove(id) {
   if (!confirm('Delete this report? This cannot be undone.')) return
   try {
     await deleteDocument(id)
-    documents.value = documents.value.filter(d => d.id !== id)
     if (selectedId.value === id) {
       selectedDoc.value = null
       selectedId.value = null
       presignedUrl.value = ''
+    }
+    // Reload from server so the page backfills; step back if this page emptied
+    await loadPage(page.value)
+    if (documents.value.length === 0 && page.value > 0) {
+      await loadPage(page.value - 1)
     }
   } catch {
     // non-critical: list remains intact if delete fails
@@ -187,6 +205,25 @@ function relativeDate(iso) {
 .badge.csv   { background: #e0f2fe; color: #0369a1; }
 .doc-status { font-size: 12px; color: var(--text-2); }
 .doc-date   { font-size: 11px; color: var(--text-2); }
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.pager-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-2);
+}
+.pager-btn:disabled { opacity: 0.4; cursor: default; }
+.pager-btn:not(:disabled):hover { background: var(--bg); }
 
 /* Right panel */
 .preview-panel {

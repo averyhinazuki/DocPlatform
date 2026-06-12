@@ -1,5 +1,25 @@
 # DocPlatform Changelog
 
+## 2026-06-13 — Pagination on document lists
+
+**Feature:** `GET /api/files` is paginated. Documents live in MongoDB, so this uses Spring Data `Pageable` (not MyBatis-Plus as the backlog originally guessed). The endpoint takes `page` (default 0) and `size` (default 20, clamped 1–100) and returns a generic `PageResponse<T>` envelope: `{items, page, size, totalElements, totalPages}`. Both repository finders gained `Pageable` parameters; sort stays newest-first via the method name. Frontend: FilesView's document list and ReportsView's Report History card each get a Prev/Next pager (20/page and 10/page respectively); delete now reloads the current page from the server so it backfills, stepping back a page if the last item on a page was deleted; submitting a report still refreshes history to page 0 where the new report appears. Known minor limitation: the `/files?docId=` deep-link auto-selects only if the doc is on page 0 (newest-first makes this the overwhelmingly common case for notification clicks).
+
+**Files created:**
+- `src/main/java/com/example/docplatform/dto/PageResponse.java` — generic pagination envelope with `PageResponse.of(Page)` factory
+
+**Files modified:**
+- `src/main/java/com/example/docplatform/repository/GeneratedDocumentRepository.java` — both tenant/user finders take `Pageable`, return `Page`
+- `src/main/java/com/example/docplatform/service/FileService.java` — `listByTenant`/`listByUser` take page+size, return `PageResponse<DocumentSummary>`; `toSummary` helper extracted
+- `src/main/java/com/example/docplatform/controller/FileController.java` — `page`/`size` request params with clamping
+- `frontend/src/api/files.js` — `listDocuments(page, size)`
+- `frontend/src/views/FilesView.vue` — pager UI + `loadPage()`; delete reloads from server
+- `frontend/src/views/ReportsView.vue` — history pager UI; `loadHistory(p)`; delete reloads from server
+
+**Tests modified:**
+- `src/test/java/com/example/docplatform/service/FileServiceTest.java` — list tests updated to `PageImpl`/`PageRequest` mocks; new `listByTenant_reportsTotalAcrossPages` (21 docs / size 10 → 3 pages). 72 tests green.
+
+---
+
 ## 2026-06-13 — Kafka retry + dead-letter topic on ReportJobConsumer
 
 **Feature:** Failed report jobs now recover from transient failures instead of silently disappearing. `ReportJobConsumer` gains `@RetryableTopic(attempts = "4", backoff = @Backoff(delay = 10_000, multiplier = 3.0))`, producing a retry schedule of 10 s → 30 s → 90 s before the message lands in the DLT. Exception classification inside the consumer separates retryable from fatal: `IllegalStateException` (document/template not found) and `IllegalArgumentException` (no generator for format) are caught, the document is marked FAILED immediately, and the method returns normally (offset committed, no retry). All other exceptions — MinIO hiccup, MongoDB timeout, rendering crash — are re-thrown so `@RetryableTopic` routes them through the retry topics. A `@DltHandler` marks the document FAILED ("Report job failed after max retries") once retries are exhausted — unless the doc is already COMPLETED (final attempt may have succeeded and only failed publishing the completion event).

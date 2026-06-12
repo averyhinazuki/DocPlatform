@@ -1,6 +1,7 @@
 package com.example.docplatform.service;
 
 import com.example.docplatform.document.GeneratedDocument;
+import com.example.docplatform.dto.PageResponse;
 import com.example.docplatform.dto.file.DocumentSummary;
 import com.example.docplatform.enums.FileFormat;
 import com.example.docplatform.enums.ReportStatus;
@@ -13,6 +14,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -55,22 +59,44 @@ class FileServiceTest {
         doc.setGeneratedAt(LocalDateTime.of(2026, 5, 29, 10, 0));
         doc.setScheduleId(42L);
 
-        when(documentRepository.findByTenantIdOrderByGeneratedAtDesc(1L)).thenReturn(List.of(doc));
+        when(documentRepository.findByTenantIdOrderByGeneratedAtDesc(1L, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(doc), PageRequest.of(0, 20), 1));
 
-        List<DocumentSummary> result = fileService.listByTenant(1L);
+        PageResponse<DocumentSummary> result = fileService.listByTenant(1L, 0, 20);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).id()).isEqualTo("doc-1");
-        assertThat(result.get(0).fileFormat()).isEqualTo(FileFormat.PDF);
-        assertThat(result.get(0).status()).isEqualTo(ReportStatus.COMPLETED);
-        assertThat(result.get(0).generatedAt()).isEqualTo(LocalDateTime.of(2026, 5, 29, 10, 0));
-        assertThat(result.get(0).scheduleId()).isEqualTo(42L);
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().get(0).id()).isEqualTo("doc-1");
+        assertThat(result.items().get(0).fileFormat()).isEqualTo(FileFormat.PDF);
+        assertThat(result.items().get(0).status()).isEqualTo(ReportStatus.COMPLETED);
+        assertThat(result.items().get(0).generatedAt()).isEqualTo(LocalDateTime.of(2026, 5, 29, 10, 0));
+        assertThat(result.items().get(0).scheduleId()).isEqualTo(42L);
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.totalPages()).isEqualTo(1);
     }
 
     @Test
-    void listByTenant_returnsEmptyListWhenNoDocs() {
-        when(documentRepository.findByTenantIdOrderByGeneratedAtDesc(1L)).thenReturn(List.of());
-        assertThat(fileService.listByTenant(1L)).isEmpty();
+    void listByTenant_returnsEmptyPageWhenNoDocs() {
+        when(documentRepository.findByTenantIdOrderByGeneratedAtDesc(1L, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+        assertThat(fileService.listByTenant(1L, 0, 20).items()).isEmpty();
+    }
+
+    @Test
+    void listByTenant_reportsTotalAcrossPages() {
+        GeneratedDocument doc = new GeneratedDocument();
+        doc.setId("doc-2"); doc.setFileFormat(FileFormat.CSV);
+        doc.setStatus(ReportStatus.COMPLETED);
+        doc.setGeneratedAt(LocalDateTime.of(2026, 6, 13, 8, 0));
+
+        // page 1 of a 21-doc collection at size 10 → totalPages 3
+        when(documentRepository.findByTenantIdOrderByGeneratedAtDesc(1L, PageRequest.of(1, 10)))
+                .thenReturn(new PageImpl<>(List.of(doc), PageRequest.of(1, 10), 21));
+
+        PageResponse<DocumentSummary> result = fileService.listByTenant(1L, 1, 10);
+
+        assertThat(result.page()).isEqualTo(1);
+        assertThat(result.totalElements()).isEqualTo(21);
+        assertThat(result.totalPages()).isEqualTo(3);
     }
 
     @Test
@@ -81,12 +107,13 @@ class FileServiceTest {
         doc.setGeneratedAt(LocalDateTime.of(2026, 5, 31, 9, 0));
         doc.setUserId(7L);
 
-        when(documentRepository.findByTenantIdAndUserIdOrderByGeneratedAtDesc(1L, 7L)).thenReturn(List.of(doc));
+        when(documentRepository.findByTenantIdAndUserIdOrderByGeneratedAtDesc(1L, 7L, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(doc), PageRequest.of(0, 20), 1));
 
-        List<DocumentSummary> result = fileService.listByUser(1L, 7L);
+        PageResponse<DocumentSummary> result = fileService.listByUser(1L, 7L, 0, 20);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).id()).isEqualTo("doc-u");
+        assertThat(result.items()).hasSize(1);
+        assertThat(result.items().get(0).id()).isEqualTo("doc-u");
     }
 
     @Test

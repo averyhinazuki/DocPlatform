@@ -96,7 +96,7 @@
     <div class="card history-card">
       <div class="history-header">
         <h2>Report History</h2>
-        <button class="btn btn-ghost btn-sm" @click="loadHistory" :disabled="historyLoading">
+        <button class="btn btn-ghost btn-sm" @click="loadHistory(historyPage)" :disabled="historyLoading">
           {{ historyLoading ? 'Refreshing…' : 'Refresh' }}
         </button>
       </div>
@@ -127,6 +127,11 @@
           </tr>
         </tbody>
       </table>
+      <div v-if="historyTotalPages > 1" class="pager">
+        <button class="pager-btn" :disabled="historyPage === 0" @click="loadHistory(historyPage - 1)">‹ Prev</button>
+        <span>Page {{ historyPage + 1 }} of {{ historyTotalPages }}</span>
+        <button class="pager-btn" :disabled="historyPage >= historyTotalPages - 1" @click="loadHistory(historyPage + 1)">Next ›</button>
+      </div>
     </div>
   </div>
 </template>
@@ -165,6 +170,8 @@ const error = ref('')
 const documentId = ref('')
 const history = ref([])
 const historyLoading = ref(false)
+const historyPage = ref(0)
+const historyTotalPages = ref(0)
 const rteContent = ref('')
 const isRteMode = computed(() =>
   selectedTemplate.value !== null &&
@@ -210,11 +217,13 @@ function humanize(key) {
     .replace(/\b\w/g, c => c.toUpperCase())
 }
 
-async function loadHistory() {
+async function loadHistory(p = 0) {
   historyLoading.value = true
   try {
-    const res = await listDocuments()
-    history.value = res.data
+    const res = await listDocuments(p, 10)
+    history.value = res.data.items
+    historyPage.value = res.data.page
+    historyTotalPages.value = res.data.totalPages
   } catch { /* non-critical */ }
   finally { historyLoading.value = false }
 }
@@ -227,7 +236,11 @@ async function removeDoc(id) {
   if (!confirm('Delete this report? This cannot be undone.')) return
   try {
     await deleteDocument(id)
-    history.value = history.value.filter(d => d.id !== id)
+    // Reload from server so the page backfills; step back if this page emptied
+    await loadHistory(historyPage.value)
+    if (history.value.length === 0 && historyPage.value > 0) {
+      await loadHistory(historyPage.value - 1)
+    }
   } catch { /* non-critical */ }
 }
 
@@ -323,6 +336,25 @@ async function submit() {
 .param-label { font-size: 13px; color: var(--text-2); font-weight: 500; }
 
 .history-card { margin-top: 24px; }
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.pager-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--text-2);
+}
+.pager-btn:disabled { opacity: 0.4; cursor: default; }
+.pager-btn:not(:disabled):hover { background: var(--bg); }
 .history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .history-header h2 { margin: 0; }
 .h-hint { padding: 12px 0; color: var(--text-2); font-size: 13px; }

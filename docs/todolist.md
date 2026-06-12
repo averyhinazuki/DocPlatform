@@ -33,8 +33,10 @@ A failed report job currently has no recovery path. Add retry with backoff on a 
 
 **Implemented:** `@RetryableTopic` (4 attempts, 10s/30s/90s backoff) + `@DltHandler`; non-retryable (ISE/IAE) marked FAILED immediately, transient rethrown to retry topics. Review fix: quota released exactly once per job on terminal outcomes only (rethrow keeps the slot held), DLT handler never overwrites COMPLETED. 71 tests green.
 
-## 8. Pagination on document lists
+## 8. Pagination on document lists ✅ DONE (2026-06-13)
 Document/report list endpoints return everything. Add pagination (MyBatis-Plus `Page`) and wire the frontend lists to it. Small but expected in any real app.
+
+**Implemented:** Spring Data `Pageable` (documents are in MongoDB, not MySQL — the MyBatis-Plus assumption was wrong). `GET /api/files?page=&size=` returns a `PageResponse` envelope; FilesView and ReportsView history get Prev/Next pagers. 72 tests green.
 
 ## 9. Performance evidence: quota load test + exactly-once crash demo
 JMeter run with two tenants — one flooding report requests, proving clean 429s for the busy tenant and no starvation for the other. Separately, a crash-recovery demo: kill the consumer between MinIO write and Mongo update, restart, show exactly one report and no orphan. Produces the measurable numbers the resume bullets need.
